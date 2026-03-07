@@ -501,13 +501,12 @@ function LocationPicker({districts,concelhos,freguesias,onChange,teal,inp,inpB,m
 }
 
 // ─── CONTACT FORM ─────────────────────────────────────────────────────────────
-function ContactForm({contact, setContact, onSave, onClose, onDelete, isNew, isMobile, theme}) {
+function ContactForm({contact, setContact, onSave, onClose, isNew, isMobile, theme}) {
   const {teal,text,muted,inp,inpB,border,card,BTNP,BTNS:mkBTNS,INP:mkINP,FL:mkFL} = theme;
   const INP = mkINP(inp,inpB,text);
   const BTNS = mkBTNS(inp,border,muted);
   const set = f => setContact(c=>({...c,...f}));
   const togArr = (a,v) => a.includes(v)?a.filter(x=>x!==v):[...a,v];
-  const [confirmDel, setConfirmDel] = useState(false);
   return (
     <AppModal onClose={onClose} title={isNew?"Novo Contacto":"Editar Contacto"} wide isMobile={isMobile} card={card} border={border} text={text} muted={muted}>
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
@@ -543,20 +542,6 @@ function ContactForm({contact, setContact, onSave, onClose, onDelete, isNew, isM
         </select>
       </FL>
       <FL label="Notas" muted={muted}><textarea style={{...INP,resize:"vertical"}} rows={3} value={contact.notes} onChange={e=>set({notes:e.target.value})} placeholder="Informações adicionais..."/></FL>
-      {!isNew&&(confirmDel
-        ?<div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:10,padding:14,marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:600,color:"#ef4444",marginBottom:10}}>⚠️ Tens a certeza que queres eliminar este contacto?</div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>setConfirmDel(false)} style={{...BTNS,flex:1,justifyContent:"center",fontSize:13}}>Cancelar</button>
-            <button onClick={onDelete} style={{background:"#ef4444",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontWeight:600,cursor:"pointer",fontSize:13,flex:1,justifyContent:"center",display:"inline-flex",alignItems:"center",gap:6}}>
-              <span className="material-icons-outlined" style={{fontSize:15}}>delete</span>Eliminar
-            </button>
-          </div>
-        </div>
-        :<button onClick={()=>setConfirmDel(true)} style={{...BTNS,width:"100%",justifyContent:"center",color:"#ef4444",borderColor:"#ef444433",marginBottom:14,fontSize:13}}>
-          <span className="material-icons-outlined" style={{fontSize:15}}>delete</span>Eliminar Contacto
-        </button>
-      )}
       <div style={{display:"flex",gap:10,marginTop:6}}>
         <button onClick={onClose} style={{...BTNS,flex:1,justifyContent:"center"}}>Cancelar</button>
         <button onClick={onSave} style={{...BTNP,flex:1,justifyContent:"center"}}>
@@ -568,12 +553,11 @@ function ContactForm({contact, setContact, onSave, onClose, onDelete, isNew, isM
 }
 
 // ─── PROPERTY FORM ────────────────────────────────────────────────────────────
-function PropertyForm({property, setProperty, onSave, onClose, onDelete, isNew, isMobile, theme, onPhotos}) {
+function PropertyForm({property, setProperty, onSave, onClose, isNew, isMobile, theme, onPhotos}) {
   const {teal,text,muted,inp,inpB,border,card,BTNP,BTNS:mkBTNS,INP:mkINP} = theme;
   const INP = mkINP(inp,inpB,text);
   const BTNS = mkBTNS(inp,border,muted);
   const set = f => setProperty(p=>({...p,...f}));
-  const [confirmDel, setConfirmDel] = useState(false);
   const availC = property.district?Object.keys(PORTUGAL[property.district]||{}):[];
   const availF = (property.district&&property.concelho)?PORTUGAL[property.district]?.[property.concelho]||[]:[];
   const pc = (property.photos||[]).length;
@@ -633,20 +617,6 @@ function PropertyForm({property, setProperty, onSave, onClose, onDelete, isNew, 
           )}
         </div>
       </FL>
-      {!isNew&&(confirmDel
-        ?<div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:10,padding:14,marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:600,color:"#ef4444",marginBottom:10}}>⚠️ Tens a certeza que queres eliminar este imóvel?</div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>setConfirmDel(false)} style={{...BTNS,flex:1,justifyContent:"center",fontSize:13}}>Cancelar</button>
-            <button onClick={onDelete} style={{background:"#ef4444",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontWeight:600,cursor:"pointer",fontSize:13,flex:1,justifyContent:"center",display:"inline-flex",alignItems:"center",gap:6}}>
-              <span className="material-icons-outlined" style={{fontSize:15}}>delete</span>Eliminar
-            </button>
-          </div>
-        </div>
-        :<button onClick={()=>setConfirmDel(true)} style={{...BTNS,width:"100%",justifyContent:"center",color:"#ef4444",borderColor:"#ef444433",marginBottom:14,fontSize:13}}>
-          <span className="material-icons-outlined" style={{fontSize:15}}>delete</span>Eliminar Imóvel
-        </button>
-      )}
       <div style={{display:"flex",gap:10,marginTop:6}}>
         <button onClick={onClose} style={{...BTNS,flex:1,justifyContent:"center"}}>Cancelar</button>
         <button onClick={onSave} style={{...BTNP,flex:1,justifyContent:"center"}}>
@@ -659,9 +629,7 @@ function PropertyForm({property, setProperty, onSave, onClose, onDelete, isNew, 
 
 // ─── SEND MODAL ───────────────────────────────────────────────────────────────
 function SendModal({property, contacts, onClose, isMobile, theme}) {
-  const photoCount = (property?.photos||[]).length;
-  const photoNote = photoCount>0 ? `\n📷 ${photoCount} foto${photoCount>1?"s":""} disponíve${photoCount>1?"is":"l"}.` : "";
-  const [msg, setMsg] = useState(property?`Olá {nome}! Tenho um imóvel que pode ser do seu interesse: ${property.title} por ${property.price?.toLocaleString("pt-PT")}€.${photoNote} Tem interesse em saber mais?`:"");
+  const [msg, setMsg] = useState(property?`Olá {nome}! Tenho um imóvel que pode ser do seu interesse: ${property.title} por ${property.price?.toLocaleString("pt-PT")}€. Tem interesse em saber mais?`:"");
   const [sentIds, setSentIds] = useState([]);
   const {teal,text,muted,inp,inpB,border,card,BTNP,BTNS:mkBTNS,INP:mkINP} = theme;
   const INP = mkINP(inp,inpB,text);
@@ -672,19 +640,7 @@ function SendModal({property, contacts, onClose, isMobile, theme}) {
   if(!property) return null;
   return (
     <AppModal onClose={onClose} title="Enviar via WhatsApp" wide isMobile={isMobile} card={card} border={border} text={text} muted={muted}>
-      {/* Property preview with photo */}
-      <div style={{display:"flex",gap:12,background:inp,borderRadius:10,padding:12,marginTop:-14,marginBottom:14,alignItems:"center"}}>
-        <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:`${teal}22`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>
-          {property.photos?.[0]?.url
-            ?<img src={property.photos[0].url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-            :"🏠"}
-        </div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:700,color:text,fontSize:14}}>{property.title}</div>
-          <div style={{fontSize:13,color:teal,fontWeight:600}}>{property.price?.toLocaleString("pt-PT")}€</div>
-          <div style={{fontSize:11,color:muted,marginTop:2}}>📷 {photoCount} foto{photoCount!==1?"s":""} · {property.typology} · {property.area}m²</div>
-        </div>
-      </div>
+      <p style={{color:muted,fontSize:13,marginTop:-14,marginBottom:14}}><strong style={{color:text}}>{property.title}</strong> · {property.price?.toLocaleString("pt-PT")}€</p>
       <FL label="Mensagem (usa {nome} para personalizar)" muted={muted}><textarea style={{...INP,resize:"vertical"}} rows={3} value={msg} onChange={e=>setMsg(e.target.value)}/></FL>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <div style={{fontSize:13,fontWeight:700,color:text}}>{matches.length} contactos correspondentes</div>
@@ -758,93 +714,15 @@ function PropCard({p, onEdit, onSend, matchCount, isMobile, theme}) {
   );
 }
 
-const DEMO_USERS = [
-  {id:1, name:"Miguel Ramos",  email:"miguel@imopro.pt", password:"demo123", plan:"Pro"},
-  {id:2, name:"Ana Silva",     email:"ana@imopro.pt",    password:"demo456", plan:"Starter"},
-];
-
-function LoginScreen({onLogin, dark}) {
-  const [email, setEmail]   = useState("");
-  const [pass,  setPass]    = useState("");
-  const [error, setError]   = useState("");
-  const [loading, setLoading] = useState(false);
-  const teal="#3BB2A1";
-  const bg    = dark?"#0f172a":"#f1f5f9";
-  const card  = dark?"#1e293b":"#ffffff";
-  const border= dark?"#334155":"#e2e8f0";
-  const text  = dark?"#f1f5f9":"#0f172a";
-  const muted = dark?"#94a3b8":"#64748b";
-  const inp   = dark?"#0f172a":"#f8fafc";
-  const inpB  = dark?"#334155":"#cbd5e1";
-  const handleLogin = () => {
-    setLoading(true); setError("");
-    setTimeout(()=>{
-      const user = DEMO_USERS.find(u=>u.email===email.trim()&&u.password===pass);
-      if(user) { onLogin(user); }
-      else { setError("Email ou palavra-passe incorrectos."); setLoading(false); }
-    },600);
-  };
-  return (
-    <div style={{minHeight:"100vh",background:bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Inter',sans-serif"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-      <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
-      <div style={{width:"100%",maxWidth:400}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{width:56,height:56,background:teal,borderRadius:14,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:12}}>
-            <span className="material-icons-outlined" style={{color:"#fff",fontSize:28}}>home_work</span>
-          </div>
-          <h1 style={{fontSize:26,fontWeight:700,color:text,margin:0}}>ImoPro</h1>
-          <p style={{fontSize:14,color:muted,marginTop:4}}>Gestão Imobiliária Profissional</p>
-        </div>
-        <div style={{background:card,border:`1px solid ${border}`,borderRadius:16,padding:28}}>
-          <h2 style={{fontSize:18,fontWeight:700,color:text,marginBottom:20}}>Entrar na conta</h2>
-          <div style={{marginBottom:14}}>
-            <label style={{display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Email</label>
-            <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="o_teu@email.pt"
-              style={{background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"10px 13px",color:text,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"}}/>
-          </div>
-          <div style={{marginBottom:20}}>
-            <label style={{display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Palavra-passe</label>
-            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="••••••••"
-              style={{background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"10px 13px",color:text,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"}}/>
-          </div>
-          {error&&<div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:8,padding:"10px 14px",color:"#ef4444",fontSize:13,marginBottom:14}}>⚠️ {error}</div>}
-          <button onClick={handleLogin} disabled={loading} style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:8,padding:"11px",fontWeight:700,cursor:"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1}}>
-            {loading?<span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>:<span className="material-icons-outlined" style={{fontSize:18}}>login</span>}
-            {loading?"A entrar...":"Entrar"}
-          </button>
-          <div style={{marginTop:20,padding:14,background:inp,borderRadius:10,border:`1px solid ${border}`}}>
-            <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Contas de demonstração</div>
-            {DEMO_USERS.map(u=>(
-              <div key={u.id} onClick={()=>{setEmail(u.email);setPass(u.password);}} style={{cursor:"pointer",padding:"6px 8px",borderRadius:6,marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}
-                onMouseEnter={e=>e.currentTarget.style.background=dark?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.03)"}
-                onMouseLeave={e=>e.currentTarget.style.background=""}>
-                <div><div style={{fontSize:13,fontWeight:600,color:text}}>{u.email}</div><div style={{fontSize:11,color:muted}}>{u.password} · Plano {u.plan}</div></div>
-                <span className="material-icons-outlined" style={{fontSize:16,color:muted}}>arrow_forward</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-}
-
-const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"}];
+const NAV_ITEMS=[{id:"dashboard",icon:"dashboard",label:"Dashboard"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"}];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function ImoPro() {
-  const [currentUser, setCurrentUser] = useState(null);
   const [dark, setDark]   = useState(false);
   const [page, setPage]   = useState("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [contacts,    setContacts]    = useState(MOCK_CONTACTS.map(c=>({...c,userId:1})));
-  const [properties,  setProperties]  = useState(MOCK_PROPERTIES.map(p=>({...p,userId:1})));
-
-  // Filtrar por utilizador actual
-  const myContacts   = contacts.filter(c=>c.userId===currentUser?.id);
-  const myProperties = properties.filter(p=>p.userId===currentUser?.id);
+  const [contacts,    setContacts]    = useState(MOCK_CONTACTS);
+  const [properties,  setProperties]  = useState(MOCK_PROPERTIES);
   const [search,    setSearch]   = useState("");
   const [filterInt, setFilterInt] = useState("");
   const [notif,     setNotif]    = useState(null);
@@ -875,15 +753,15 @@ export default function ImoPro() {
 
   const showNotif = msg=>{setNotif(msg);setTimeout(()=>setNotif(null),3000);};
 
-  const getMatches = useCallback(p=>myContacts.filter(c=>
+  const getMatches = useCallback(p=>contacts.filter(c=>
     (c.interests||[]).includes(p.type)&&
     (!(c.typologies||[]).length||(c.typologies||[]).includes(p.typology))&&
     (!(c.concelhos||[]).length||(c.concelhos||[]).includes(p.concelho))
-  ),[myContacts]);
+  ),[contacts]);
 
   const getScore = (c,p)=>{ let s=0; if((c.interests||[]).includes(p.type))s++; if(!(c.typologies||[]).length||(c.typologies||[]).includes(p.typology))s++; if(!(c.concelhos||[]).length||(c.concelhos||[]).includes(p.concelho))s++; return Math.round(s/3*100); };
 
-  const filtered = myContacts.filter(c=>{
+  const filtered = contacts.filter(c=>{
     const ms=c.name.toLowerCase().includes(search.toLowerCase())||c.phone.includes(search);
     const mi=filterInt?(c.interests||[]).includes(filterInt):true;
     return ms&&mi;
@@ -904,27 +782,17 @@ export default function ImoPro() {
 
   const saveContact = ()=>{
     if(!editContact.name||!editContact.phone) return;
-    if(isNewContact) setContacts(cs=>[...cs,{...editContact,id:Date.now(),userId:currentUser.id}]);
+    if(isNewContact) setContacts(cs=>[...cs,{...editContact,id:Date.now()}]);
     else setContacts(cs=>cs.map(c=>c.id===editContact.id?editContact:c));
     setEditContact(null); showNotif(isNewContact?"Contacto adicionado!":"Contacto actualizado!");
-  };
-
-  const deleteContact = ()=>{
-    setContacts(cs=>cs.filter(c=>c.id!==editContact.id));
-    setEditContact(null); showNotif("Contacto eliminado.");
   };
 
   const saveProperty = ()=>{
     if(!editProperty.title||!editProperty.type) return;
     const p={...editProperty,price:Number(editProperty.price),area:Number(editProperty.area)};
-    if(isNewProperty) setProperties(ps=>[...ps,{...p,id:Date.now(),userId:currentUser.id}]);
+    if(isNewProperty) setProperties(ps=>[...ps,{...p,id:Date.now()}]);
     else setProperties(ps=>ps.map(x=>x.id===p.id?p:x));
     setEditProperty(null); showNotif(isNewProperty?"Imóvel adicionado!":"Imóvel actualizado!");
-  };
-
-  const deleteProperty = ()=>{
-    setProperties(ps=>ps.filter(p=>p.id!==editProperty.id));
-    setEditProperty(null); showNotif("Imóvel eliminado.");
   };
 
   const handlePhotos = e=>{
@@ -935,9 +803,7 @@ export default function ImoPro() {
     e.target.value="";
   };
 
-  const PAGE_TITLE = {dashboard:"Início",contacts:"Contactos",properties:"Imóveis",matches:"Matches",campaigns:"Campanhas",social:"Redes Sociais"}[page];
-
-  if(!currentUser) return <LoginScreen onLogin={setCurrentUser} dark={dark}/>;
+  const PAGE_TITLE = {dashboard:"Dashboard",contacts:"Contactos",properties:"Imóveis",matches:"Matches",campaigns:"Campanhas",social:"Redes Sociais"}[page];
 
   return (
     <div style={{fontFamily:"'Inter',sans-serif",background:bg,minHeight:"100vh",color:text,transition:"all 0.2s"}}>
@@ -985,11 +851,8 @@ export default function ImoPro() {
               {(!isTablet||isMobile)&&(dark?"Modo Claro":"Modo Escuro")}
             </button>
             {(!isTablet||isMobile)&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"6px 12px"}}>
-              <div style={{width:30,height:30,borderRadius:"50%",background:teal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(currentUser.name)}</div>
-              <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser.name}</div><div style={{fontSize:11,color:muted}}>Plano {currentUser.plan}</div></div>
-              <button onClick={()=>setCurrentUser(null)} title="Sair" style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4,flexShrink:0}}>
-                <span className="material-icons-outlined" style={{fontSize:18}}>logout</span>
-              </button>
+              <div style={{width:30,height:30,borderRadius:"50%",background:teal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>MR</div>
+              <div><div style={{fontSize:13,fontWeight:600,color:text}}>Miguel Ramos</div><div style={{fontSize:11,color:muted}}>Plano Pro</div></div>
             </div>}
           </div>
         </aside>
@@ -1010,13 +873,13 @@ export default function ImoPro() {
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar..." style={{...INP,paddingLeft:32,width:180,fontSize:13}}/>
               </div>}
               {page==="contacts"&&<>
-                <button onClick={()=>{setImportPrev([]);setImportErr("");setShowImport(true);}} style={{...BTNS,fontSize:13,padding:"8px 14px"}}>
-                  <span className="material-icons-outlined" style={{fontSize:15}}>upload</span>{!isMobile&&"Importar"}
-                </button>
+                {!isMobile&&<button onClick={()=>{setImportPrev([]);setImportErr("");setShowImport(true);}} style={{...BTNS,fontSize:13,padding:"8px 14px"}}>
+                  <span className="material-icons-outlined" style={{fontSize:15}}>upload</span>Importar
+                </button>}
                 <button onClick={()=>{setEditContact({...EMPTY_C});setIsNewContact(true);}} style={{...BTNP,fontSize:13,padding:"8px 14px"}}>
                   <span className="material-icons-outlined" style={{fontSize:15}}>person_add</span>{!isMobile&&"Novo Contacto"}
                 </button>
-              </> }
+              </>}
               {page==="properties"&&<button onClick={()=>{setEditProperty({...EMPTY_P});setIsNewProperty(true);}} style={{...BTNP,fontSize:13,padding:"8px 14px"}}>
                 <span className="material-icons-outlined" style={{fontSize:15}}>add_home</span>{!isMobile&&"Novo Imóvel"}
               </button>}
@@ -1035,7 +898,7 @@ export default function ImoPro() {
             {/* DASHBOARD */}
             {page==="dashboard"&&<div>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:isMobile?12:18,marginBottom:isMobile?16:26}}>
-                {[{label:"Contactos",value:myContacts.length,icon:"people",color:"#3b82f6",sub:"+3 este mês"},{label:"Leads Quentes",value:myContacts.filter(c=>c.status==="Quente").length,icon:"local_fire_department",color:"#ef4444",sub:"Prontos"},{label:"Imóveis",value:myProperties.length,icon:"apartment",color:teal,sub:"Em carteira"},{label:"WhatsApp",value:12,icon:"chat",color:"#10b981",sub:"Esta semana"}].map((st,i)=>(
+                {[{label:"Contactos",value:contacts.length,icon:"people",color:"#3b82f6",sub:"+3 este mês"},{label:"Leads Quentes",value:contacts.filter(c=>c.status==="Quente").length,icon:"local_fire_department",color:"#ef4444",sub:"Prontos"},{label:"Imóveis",value:properties.length,icon:"apartment",color:teal,sub:"Em carteira"},{label:"WhatsApp",value:12,icon:"chat",color:"#10b981",sub:"Esta semana"}].map((st,i)=>(
                   <div key={i} style={{...CARD,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                     <div><div style={{fontSize:10,color:muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6,fontWeight:600}}>{st.label}</div><div style={{fontSize:isMobile?26:32,fontWeight:700,color:st.color,lineHeight:1}}>{st.value}</div><div style={{fontSize:11,color:muted,marginTop:5}}>{st.sub}</div></div>
                     <div style={{width:38,height:38,borderRadius:9,background:`${st.color}18`,display:"flex",alignItems:"center",justifyContent:"center"}}><span className="material-icons-outlined" style={{color:st.color,fontSize:20}}>{st.icon}</span></div>
@@ -1048,7 +911,7 @@ export default function ImoPro() {
                     <h3 style={{fontSize:15,fontWeight:700,color:text}}>Leads Quentes</h3>
                     <button onClick={()=>setPage("contacts")} style={{background:"none",border:"none",color:teal,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Ver todos →</button>
                   </div>
-                  {myContacts.filter(c=>c.status==="Quente").map(c=>(
+                  {contacts.filter(c=>c.status==="Quente").map(c=>(
                     <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${border}`}}>
                       <div style={{width:34,height:34,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(c.name)}</div>
                       <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{(c.interests||[]).join(", ")} · {(c.concelhos||[])[0]||"—"}</div></div>
@@ -1061,7 +924,7 @@ export default function ImoPro() {
                     <h3 style={{fontSize:15,fontWeight:700,color:text}}>Imóveis para Enviar</h3>
                     <button onClick={()=>setPage("properties")} style={{background:"none",border:"none",color:teal,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Ver todos →</button>
                   </div>
-                  {myProperties.map(p=>{const ms=getMatches(p);return(
+                  {properties.map(p=>{const ms=getMatches(p);return(
                     <div key={p.id} style={{padding:"11px 0",borderBottom:`1px solid ${border}`}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                         <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title}</div><div style={{fontSize:12,color:muted,marginTop:2}}>{p.concelho} · {p.price?.toLocaleString("pt-PT")}€</div></div>
@@ -1116,14 +979,14 @@ export default function ImoPro() {
                       ))}</tbody>
                     </table>
                   </div>
-                  <div style={{padding:"11px 18px",borderTop:`1px solid ${border}`,background:thead}}><span style={{fontSize:13,color:muted}}>A mostrar {filtered.length} de {myContacts.length} contactos</span></div>
+                  <div style={{padding:"11px 18px",borderTop:`1px solid ${border}`,background:thead}}><span style={{fontSize:13,color:muted}}>A mostrar {filtered.length} de {contacts.length} contactos</span></div>
                 </div>
               )}
             </div>}
 
             {/* IMÓVEIS */}
             {page==="properties"&&<div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":isTablet?"1fr 1fr":"repeat(auto-fill,minmax(360px,1fr))",gap:isMobile?14:20}}>
-              {myProperties.map(p=><PropCard key={p.id} p={p} matchCount={getMatches(p).length} isMobile={isMobile} theme={theme}
+              {properties.map(p=><PropCard key={p.id} p={p} matchCount={getMatches(p).length} isMobile={isMobile} theme={theme}
                 onEdit={()=>{setEditProperty({...p});setIsNewProperty(false);}}
                 onSend={()=>setSendProp(p)}/>)}
             </div>}
@@ -1131,7 +994,7 @@ export default function ImoPro() {
             {/* MATCHES */}
             {page==="matches"&&<div>
               <p style={{color:muted,marginBottom:20,fontSize:14}}>Contactos filtrados automaticamente. Clica "Enviar" para abrir o WhatsApp directamente.</p>
-              {[...myProperties].sort((a,b)=>b.id-a.id).map(p=>{const ms=getMatches(p);return(
+              {properties.map(p=>{const ms=getMatches(p);return(
                 <div key={p.id} style={{...CARD,marginBottom:18}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
                     <div><h3 style={{fontSize:15,fontWeight:700,color:text}}>{p.title}</h3><div style={{fontSize:13,color:muted,marginTop:2}}>{p.concelho} · {p.typology} · {p.price?.toLocaleString("pt-PT")}€</div></div>
@@ -1227,9 +1090,9 @@ export default function ImoPro() {
       </div>
 
       {/* MODALS */}
-      {editContact&&<ContactForm contact={editContact} setContact={setEditContact} onSave={saveContact} onDelete={deleteContact} onClose={()=>setEditContact(null)} isNew={isNewContact} isMobile={isMobile} theme={theme}/>}
-      {editProperty&&<PropertyForm property={editProperty} setProperty={setEditProperty} onSave={saveProperty} onDelete={deleteProperty} onClose={()=>setEditProperty(null)} isNew={isNewProperty} isMobile={isMobile} theme={theme} onPhotos={handlePhotos}/>}
-      {sendProp&&<SendModal property={sendProp} contacts={myContacts} onClose={()=>setSendProp(null)} isMobile={isMobile} theme={theme}/>}
+      {editContact&&<ContactForm contact={editContact} setContact={setEditContact} onSave={saveContact} onClose={()=>setEditContact(null)} isNew={isNewContact} isMobile={isMobile} theme={theme}/>}
+      {editProperty&&<PropertyForm property={editProperty} setProperty={setEditProperty} onSave={saveProperty} onClose={()=>setEditProperty(null)} isNew={isNewProperty} isMobile={isMobile} theme={theme} onPhotos={handlePhotos}/>}
+      {sendProp&&<SendModal property={sendProp} contacts={contacts} onClose={()=>setSendProp(null)} isMobile={isMobile} theme={theme}/>}
 
       {/* IMPORT MODAL */}
       {showImport&&(
@@ -1266,7 +1129,7 @@ export default function ImoPro() {
           </div>}
           <div style={{display:"flex",gap:10,marginTop:16}}>
             <button onClick={()=>setShowImport(false)} style={{...BTNS,flex:1,justifyContent:"center"}}>Cancelar</button>
-            {importPrev.length>0&&<button onClick={()=>{const n=importPrev.filter(p=>!myContacts.find(c=>c.phone&&c.phone===p.phone)).map(c=>({...c,userId:currentUser.id}));setContacts([...contacts,...n]);setImportPrev([]);setShowImport(false);showNotif(`${n.length} contactos importados!`);}} style={{...BTNP,flex:2,justifyContent:"center"}}>Importar {importPrev.length} contactos</button>}
+            {importPrev.length>0&&<button onClick={()=>{const n=importPrev.filter(p=>!contacts.find(c=>c.phone&&c.phone===p.phone));setContacts([...contacts,...n]);setImportPrev([]);setShowImport(false);showNotif(`${n.length} contactos importados!`);}} style={{...BTNP,flex:2,justifyContent:"center"}}>Importar {importPrev.length} contactos</button>}
           </div>
         </AppModal>
       )}
