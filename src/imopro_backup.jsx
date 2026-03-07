@@ -914,7 +914,7 @@ function PropertyPage() {
 
       {/* Sticky Nav */}
       <nav style={{position:"sticky",top:0,zIndex:100,background:"#ffffff",backdropFilter:"blur(10px)",borderBottom:"1px solid #e2e8f0",padding:"0 24px",display:"flex",alignItems:"center",height:60,gap:24}}>
-        <img src={LOGO_URL} alt="ImoMatch" style={{height:38,objectFit:"contain",flexShrink:0}}/>
+        <img src={LOGO_URL} alt="ImoMatch" style={{height:30,objectFit:"contain",flexShrink:0}}/>
         <div style={{display:"flex",gap:4,flex:1,overflowX:"auto"}}>
           {navItems.map(n=>(
             <a key={n.id} href={`#${n.id}`} onClick={()=>setActiveSection(n.id)}
@@ -1112,21 +1112,11 @@ function PropertiesSelectionPage() {
       <style>{`*{box-sizing:border-box;margin:0;padding:0}a{text-decoration:none}.prop-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(17,45,78,0.12)!important;}`}</style>
 
       {/* Header */}
-      <nav style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 20px",display:"flex",alignItems:"center",height:68,gap:10,flexWrap:"wrap"}}>
-        <img src={LOGO_URL} alt="ImoMatch" style={{height:42,objectFit:"contain",flexShrink:0}}/>
+      <nav style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 24px",display:"flex",alignItems:"center",height:60,gap:16}}>
+        <img src={LOGO_URL} alt="ImoMatch" style={{height:30,objectFit:"contain",flexShrink:0}}/>
         <div style={{flex:1}}/>
-        <button onClick={()=>{
-          const pageUrl = window.location.href;
-          const msg = encodeURIComponent(`Olá! 👋 Preparei uma selecção de ${properties.length} imóve${properties.length===1?"l":"is"} especialmente para si:\n\n${pageUrl}\n\nEstou disponível para qualquer esclarecimento! 😊`);
-          const phone = agent?.phone?.replace(/[^0-9]/g,"") || "";
-          window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
-        }}
-          style={{display:"inline-flex",alignItems:"center",gap:7,background:"#25d366",color:"#fff",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,flexShrink:0,border:"none",cursor:"pointer",boxShadow:"0 2px 8px #25d36630"}}>
-          <span className="material-icons-outlined" style={{fontSize:17}}>share</span>
-          Partilhar Selecção
-        </button>
         {waLink&&<a href={waLink} target="_blank" rel="noreferrer"
-          style={{display:"inline-flex",alignItems:"center",gap:6,background:teal,color:"#fff",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,flexShrink:0}}>
+          style={{display:"inline-flex",alignItems:"center",gap:6,background:teal,color:"#fff",padding:"8px 18px",borderRadius:10,fontWeight:700,fontSize:13,flexShrink:0}}>
           <span className="material-icons-outlined" style={{fontSize:16}}>chat</span>Contactar Agente
         </a>}
       </nav>
@@ -1539,10 +1529,10 @@ function ImoPro() {
         <aside style={{width:isMobile?(menuOpen?260:0):isTablet?60:236,background:sidebar,borderRight:`1px solid ${border}`,display:"flex",flexDirection:"column",flexShrink:0,transition:"all 0.25s",overflow:"hidden",position:isMobile?"fixed":"relative",height:"100vh",zIndex:isMobile?200:1}}>
           <div style={{padding:"20px 16px 16px",borderBottom:`1px solid ${border}`,flexShrink:0}}>
             {(!isTablet||isMobile)&&<div style={{display:"flex",alignItems:"center",gap:10}}>
-              <img src={LOGO_URL} alt="ImoMatch" style={{height:40,width:"auto",objectFit:"contain"}}/>
+              <img src={LOGO_URL} alt="ImoMatch" style={{height:32,width:"auto",objectFit:"contain"}}/>
             </div>}
             {isTablet&&!isMobile&&<div style={{display:"flex",justifyContent:"center"}}>
-              <img src={LOGO_URL} alt="ImoMatch" style={{height:36,width:"auto",objectFit:"contain"}}/>
+              <img src={LOGO_URL} alt="ImoMatch" style={{height:30,width:"auto",objectFit:"contain"}}/>
             </div>}
           </div>
           <nav style={{flex:1,padding:"12px 8px",display:"flex",flexDirection:"column",gap:2,overflowY:"auto"}}>
@@ -1582,15 +1572,12 @@ function ImoPro() {
 
         {/* MAIN */}
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-          <header style={{height:60,background:sidebar,borderBottom:`1px solid ${border}`,padding:`0 ${isMobile?12:28}px`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,gap:10}}>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <header style={{height:60,background:sidebar,borderBottom:`1px solid ${border}`,padding:`0 ${isMobile?16:28}px`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
               {isMobile&&<button onClick={()=>setMenuOpen(!menuOpen)} style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4}}>
                 <span className="material-icons-outlined" style={{fontSize:24}}>menu</span>
               </button>}
-              {isMobile
-                ? <img src={LOGO_URL} alt="ImoMatch" style={{height:36,width:"auto",objectFit:"contain"}}/>
-                : <h1 style={{fontSize:18,fontWeight:700,color:text,whiteSpace:"nowrap"}}>{PAGE_TITLE}</h1>
-              }
+              <h1 style={{fontSize:isMobile?16:18,fontWeight:700,color:text,whiteSpace:"nowrap"}}>{PAGE_TITLE}</h1>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
               {!isMobile&&(page==="contacts"||page==="dashboard")&&<div style={{position:"relative"}}>
