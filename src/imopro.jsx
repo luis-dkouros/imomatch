@@ -1249,7 +1249,6 @@ function ImoPro() {
   const [selectedProps, setSelectedProps] = useState([]);
   const [selectedContacts, setSelectedContacts] = useState([]);
   const [confirmDeleteContacts, setConfirmDeleteContacts] = useState(false);
-  const [confirmDeleteContacts, setConfirmDeleteContacts] = useState(false);
   const [dark,      setDark]      = useState(false);
   const [page,      setPage]      = useState("dashboard");
   const [menuOpen,  setMenuOpen]  = useState(false);
