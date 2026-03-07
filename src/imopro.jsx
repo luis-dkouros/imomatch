@@ -1020,7 +1020,7 @@ export default function ImoPro() {
     const remaining = 10-current.length;
     if(remaining<=0) return;
     const toUpload = files.slice(0,remaining);
-    showNotif(`A carregar ${toUpload.length} foto${toUpload.length>1?"s"}...`);
+    showNotif(`A carregar ${toUpload.length} foto${toUpload.length>1?"s":""}...`);
     const uploaded = await Promise.all(toUpload.map(async(file)=>{
       const ext = file.name.split(".").pop();
       const path = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
