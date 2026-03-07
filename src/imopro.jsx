@@ -859,12 +859,61 @@ function LoginScreen({dark}) {
 
 const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"}];
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 // ─── PROPERTY LANDING PAGE ────────────────────────────────────────────────────
-:0;padding:0}a{text-decoration:none}`}</style>
+function PropertyPage() {
+  const { id } = useParams();
+  const [property, setProperty] = useState(null);
+  const [agent, setAgent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activePhoto, setActivePhoto] = useState(0);
+  const [activeSection, setActiveSection] = useState("gallery");
+  const teal = "#3BB2A1";
+  const navy = "#112D4E";
+
+  useEffect(()=>{
+    supabase.from("properties").select("*").eq("id", id).single()
+      .then(({data, error})=>{
+        if(!error && data){
+          setProperty(data);
+          supabase.from("profiles").select("*").eq("id", data.user_id).single()
+            .then(({data:ag})=>{ if(ag) setAgent(ag); });
+        }
+        setLoading(false);
+      });
+  },[id]);
+
+  if(loading) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f1f5f9",fontFamily:"Inter,sans-serif"}}>
+      <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+      <div style={{textAlign:"center"}}>
+        <img src={LOGO_URL} alt="ImoMatch" style={{height:48,marginBottom:20}}/>
+        <div style={{fontSize:14,color:"#3BB2A1"}}>A carregar...</div>
+      </div>
+    </div>
+  );
+  if(!property) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f1f5f9",fontFamily:"Inter,sans-serif"}}>
+      <div style={{textAlign:"center",color:"#94a3b8"}}>
+        <span className="material-icons-outlined" style={{fontSize:48,display:"block",marginBottom:12}}>home</span>
+        Imóvel não encontrado.
+      </div>
+    </div>
+  );
+
+  const photos = property.photos || [];
+  const location = [property.freguesia, property.concelho, property.district].filter(Boolean).join(", ") || "Portugal";
+  const waMsg = encodeURIComponent(`Olá ${agent?.name||""}! Tenho interesse no imóvel: ${property.title} - ${window.location.href}`);
+  const waLink = agent?.phone ? `https://wa.me/${agent.phone.replace(/[^0-9]/g,"")}?text=${waMsg}` : `https://wa.me/?text=${waMsg}`;
+  const navItems = [{id:"gallery",label:"Galeria"},{id:"details",label:"Detalhes"},{id:"location",label:"Localização"},{id:"agent",label:"Agente"}];
+
+  return (
+    <div style={{fontFamily:"'Inter',sans-serif",background:"#f1f5f9",minHeight:"100vh"}}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+      <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0}a{text-decoration:none}`}</style>
 
       {/* Sticky Nav */}
-      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(10px)",borderBottom:"1px solid #e2e8f0",padding:"0 24px",display:"flex",alignItems:"center",height:60,gap:24}}>
+      <nav style={{position:"sticky",top:0,zIndex:100,background:"#ffffff",backdropFilter:"blur(10px)",borderBottom:"1px solid #e2e8f0",padding:"0 24px",display:"flex",alignItems:"center",height:60,gap:24}}>
         <img src={LOGO_URL} alt="ImoMatch" style={{height:30,objectFit:"contain",flexShrink:0}}/>
         <div style={{display:"flex",gap:4,flex:1,overflowX:"auto"}}>
           {navItems.map(n=>(
@@ -921,7 +970,7 @@ const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",ico
         {/* Title + CTA */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:16,marginBottom:28}}>
           <div>
-            <h1 style={{fontSize:28,fontWeight:800,color:navy,marginBottom:6,lineHeight:1.2}}>{property.title}</h1>
+            <h1 style={{fontSize:28,fontWeight:800,color:"#112D4E",marginBottom:6,lineHeight:1.2}}>{property.title}</h1>
             <div style={{display:"flex",alignItems:"center",gap:6,color:"#64748b",fontSize:14}}>
               <span className="material-icons-outlined" style={{fontSize:16,color:teal}}>location_on</span>
               {location}
@@ -944,12 +993,12 @@ const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",ico
             ["square_foot","Área",property.area?`${property.area} m²`:"—"],
             ["location_on","Localização",property.concelho||property.district||"—"],
           ].map(([icon,label,value])=>(
-            <div key={label} style={{background:"#fff",borderRadius:12,padding:"16px 18px",border:"1px solid #e2e8f0",display:"flex",flexDirection:"column",gap:4}}>
+            <div key={label} style={{background:"#ffffff",borderRadius:12,padding:"16px 18px",border:"1px solid #e2e8f0",display:"flex",flexDirection:"column",gap:4}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <span className="material-icons-outlined" style={{fontSize:18,color:teal}}>{icon}</span>
                 <span style={{fontSize:11,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.06em"}}>{label}</span>
               </div>
-              <div style={{fontSize:15,fontWeight:700,color:navy}}>{value||"—"}</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#112D4E"}}>{value||"—"}</div>
             </div>
           ))}
         </div>
@@ -958,18 +1007,18 @@ const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",ico
         <div style={{display:"grid",gridTemplateColumns:"1fr",gap:24,marginBottom:32}}>
           {property.description&&(
             <div style={{background:"#fff",borderRadius:16,padding:24,border:"1px solid #e2e8f0"}}>
-              <h2 style={{fontSize:18,fontWeight:700,color:navy,marginBottom:14}}>Descrição do Imóvel</h2>
+              <h2 style={{fontSize:18,fontWeight:700,color:"#112D4E",marginBottom:14}}>Descrição do Imóvel</h2>
               <p style={{fontSize:15,color:"#475569",lineHeight:1.8}}>{property.description}</p>
             </div>
           )}
           <div id="location" style={{background:"#fff",borderRadius:16,padding:24,border:"1px solid #e2e8f0"}}>
-            <h2 style={{fontSize:18,fontWeight:700,color:navy,marginBottom:14}}>Localização</h2>
+            <h2 style={{fontSize:18,fontWeight:700,color:"#112D4E",marginBottom:14}}>Localização</h2>
             <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
               {[["location_on","Distrito",property.district],["location_city","Concelho",property.concelho],["place","Freguesia",property.freguesia]].filter(x=>x[2]).map(([icon,label,val])=>(
                 <div key={label} style={{display:"flex",alignItems:"center",gap:6,background:"#f8fafc",borderRadius:8,padding:"8px 14px",border:"1px solid #e2e8f0"}}>
                   <span className="material-icons-outlined" style={{fontSize:16,color:teal}}>{icon}</span>
                   <span style={{fontSize:13,color:"#64748b"}}>{label}:</span>
-                  <span style={{fontSize:13,fontWeight:600,color:navy}}>{val}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:"#112D4E"}}>{val}</span>
                 </div>
               ))}
             </div>
@@ -977,13 +1026,13 @@ const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",ico
         </div>
 
         {/* Agent card */}
-        <div id="agent" style={{background:navy,borderRadius:20,padding:28,marginBottom:32,color:"#fff"}}>
+        <div id="agent" style={{background:"#ffffff",borderRadius:20,padding:28,marginBottom:32,border:"1px solid #e2e8f0"}}>
           <div style={{display:"flex",alignItems:"flex-start",gap:20,flexWrap:"wrap"}}>
             {agent?.photo_url
               ?<img src={agent.photo_url} alt="" style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:"3px solid "+teal,flexShrink:0}}/>
-              :<div style={{width:80,height:80,borderRadius:"50%",background:`${teal}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,flexShrink:0,border:"3px solid "+teal}}>👤</div>}
+              :<div style={{width:80,height:80,borderRadius:"50%",background:`${teal}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,flexShrink:0,border:"3px solid "+teal}}>👤</div>}
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:20,fontWeight:800,marginBottom:4}}>{agent?.name||"Agente Imobiliário"}</div>
+              <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#112D4E"}}>{agent?.name||"Agente Imobiliário"}</div>
               <div style={{fontSize:13,color:teal,fontWeight:600,marginBottom:10}}>Consultor Imobiliário</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
                 {agent?.phone&&(
@@ -994,12 +1043,12 @@ const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",ico
                 )}
                 {agent?.email&&(
                   <a href={`mailto:${agent.email}?subject=Interesse: ${property.title}`}
-                    style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.15)",color:"#fff",padding:"10px 18px",borderRadius:10,fontWeight:700,fontSize:13,border:"1px solid rgba(255,255,255,0.2)"}}>
+                    style={{display:"inline-flex",alignItems:"center",gap:6,background:"#f1f5f9",color:"#112D4E",padding:"10px 18px",borderRadius:10,fontWeight:700,fontSize:13,border:"1px solid #e2e8f0"}}>
                     <span className="material-icons-outlined" style={{fontSize:16}}>email</span>{agent.email}
                   </a>
                 )}
                 {agent?.phone&&(
-                  <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.1)",color:"#fff",padding:"10px 18px",borderRadius:10,fontSize:13,border:"1px solid rgba(255,255,255,0.15)"}}>
+                  <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#f1f5f9",color:"#64748b",padding:"10px 18px",borderRadius:10,fontSize:13,border:"1px solid #e2e8f0"}}>
                     <span className="material-icons-outlined" style={{fontSize:16}}>phone</span>{agent.phone}
                   </div>
                 )}
@@ -1073,19 +1122,19 @@ function PropertiesSelectionPage() {
       </nav>
 
       {/* Hero */}
-      <div style={{background:`linear-gradient(135deg,${navy} 0%,#1e3a5f 100%)`,padding:"48px 24px",textAlign:"center"}}>
+      <div style={{background:"#ffffff",borderBottom:"1px solid #e2e8f0",padding:"36px 24px",textAlign:"center"}}>
         <div style={{fontSize:11,fontWeight:700,color:teal,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>Selecção de Imóveis</div>
-        <h1 style={{fontSize:32,fontWeight:800,color:"#fff",marginBottom:12,lineHeight:1.2}}>
+        <h1 style={{fontSize:32,fontWeight:800,color:"#112D4E",marginBottom:12,lineHeight:1.2}}>
           {properties.length} Imóve{properties.length===1?"l":"is"} Seleccionado{properties.length===1?"":"s"}
         </h1>
-        <p style={{fontSize:15,color:"rgba(255,255,255,0.65)",maxWidth:480,margin:"0 auto 24px"}}>
+        <p style={{fontSize:15,color:"#64748b",maxWidth:480,margin:"0 auto 24px"}}>
           Imóveis seleccionados especialmente para si
         </p>
         {/* Search */}
         <div style={{position:"relative",maxWidth:420,margin:"0 auto"}}>
           <span className="material-icons-outlined" style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",color:"#94a3b8",fontSize:18}}>search</span>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar imóvel ou localização..."
-            style={{width:"100%",padding:"13px 16px 13px 42px",borderRadius:12,border:"none",fontSize:14,outline:"none",background:"rgba(255,255,255,0.95)"}}/>
+            style={{width:"100%",padding:"13px 16px 13px 42px",borderRadius:12,border:"1px solid #e2e8f0",fontSize:14,outline:"none",background:"#f8fafc"}}/>
         </div>
       </div>
 
@@ -1196,7 +1245,7 @@ function mkStyles(dark, isMobile) {
   const teal   = "#3BB2A1";
   const navy   = dark ? "#0f172a" : "#112D4E";
   const bg     = dark ? "#0f172a" : "#f1f5f9";
-  const sidebar= dark ? "#1e293b" : "#112D4E";
+  const sidebar= dark ? "#1e293b" : "#ffffff";
   const card   = dark ? "#1e293b" : "#ffffff";
   const border = dark ? "#334155" : "#e2e8f0";
   const text   = dark ? "#f1f5f9" : "#1e293b";
