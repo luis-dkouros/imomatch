@@ -1,9 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const INTERESTS = ["Apartamento","Moradia","Terreno","Comercial","Investimento"];
 const TYPOLOGIES = ["T0","T1","T2","T3","T4+"];
@@ -763,12 +758,15 @@ function PropCard({p, onEdit, onSend, matchCount, isMobile, theme}) {
   );
 }
 
-function LoginScreen({dark}) {
-  const [mode,  setMode]  = useState("login"); // "login" | "signup"
-  const [name,  setName]  = useState("");
-  const [email, setEmail] = useState("");
-  const [pass,  setPass]  = useState("");
-  const [error, setError] = useState("");
+const DEMO_USERS = [
+  {id:1, name:"Miguel Ramos",  email:"miguel@imopro.pt", password:"demo123", plan:"Pro"},
+  {id:2, name:"Ana Silva",     email:"ana@imopro.pt",    password:"demo456", plan:"Starter"},
+];
+
+function LoginScreen({onLogin, dark}) {
+  const [email, setEmail]   = useState("");
+  const [pass,  setPass]    = useState("");
+  const [error, setError]   = useState("");
   const [loading, setLoading] = useState(false);
   const teal="#3BB2A1";
   const bg    = dark?"#0f172a":"#f1f5f9";
@@ -778,27 +776,14 @@ function LoginScreen({dark}) {
   const muted = dark?"#94a3b8":"#64748b";
   const inp   = dark?"#0f172a":"#f8fafc";
   const inpB  = dark?"#334155":"#cbd5e1";
-  const INP = {background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"10px 13px",color:text,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"};
-
-  const handle = async () => {
+  const handleLogin = () => {
     setLoading(true); setError("");
-    try {
-      if(mode==="login") {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
-        if(error) setError(error.message==="Invalid login credentials"?"Email ou palavra-passe incorrectos.":error.message);
-      } else {
-        if(!name.trim()) { setError("Indica o teu nome."); setLoading(false); return; }
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(), password: pass,
-          options: { data: { name: name.trim() } }
-        });
-        if(error) setError(error.message);
-        else setError("✅ Conta criada! Verifica o teu email para confirmar.");
-      }
-    } catch(e) { setError("Erro de ligação. Tenta novamente."); }
-    setLoading(false);
+    setTimeout(()=>{
+      const user = DEMO_USERS.find(u=>u.email===email.trim()&&u.password===pass);
+      if(user) { onLogin(user); }
+      else { setError("Email ou palavra-passe incorrectos."); setLoading(false); }
+    },600);
   };
-
   return (
     <div style={{minHeight:"100vh",background:bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Inter',sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -812,39 +797,34 @@ function LoginScreen({dark}) {
           <p style={{fontSize:14,color:muted,marginTop:4}}>Gestão Imobiliária Profissional</p>
         </div>
         <div style={{background:card,border:`1px solid ${border}`,borderRadius:16,padding:28}}>
-          {/* Tabs */}
-          <div style={{display:"flex",marginBottom:24,background:inp,borderRadius:10,padding:4}}>
-            {[["login","Entrar"],["signup","Criar conta"]].map(([m,l])=>(
-              <button key={m} onClick={()=>{setMode(m);setError("");}} style={{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,background:mode===m?card:"transparent",color:mode===m?text:muted,boxShadow:mode===m?"0 1px 4px rgba(0,0,0,0.1)":"none",transition:"all 0.15s"}}>{l}</button>
-            ))}
-          </div>
-
-          {mode==="signup"&&<div style={{marginBottom:14}}>
-            <label style={{display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Nome</label>
-            <input value={name} onChange={e=>setName(e.target.value)} placeholder="O teu nome" style={INP}/>
-          </div>}
+          <h2 style={{fontSize:18,fontWeight:700,color:text,marginBottom:20}}>Entrar na conta</h2>
           <div style={{marginBottom:14}}>
             <label style={{display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Email</label>
-            <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="o_teu@email.pt" style={INP}/>
+            <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="o_teu@email.pt"
+              style={{background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"10px 13px",color:text,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"}}/>
           </div>
           <div style={{marginBottom:20}}>
             <label style={{display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Palavra-passe</label>
-            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="••••••••" style={INP}/>
-            {mode==="signup"&&<div style={{fontSize:11,color:muted,marginTop:4}}>Mínimo 6 caracteres</div>}
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="••••••••"
+              style={{background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"10px 13px",color:text,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"}}/>
           </div>
-
-          {error&&<div style={{background:error.startsWith("✅")?"#10b98111":"#ef444411",border:`1px solid ${error.startsWith("✅")?"#10b98133":"#ef444433"}`,borderRadius:8,padding:"10px 14px",color:error.startsWith("✅")?"#10b981":"#ef4444",fontSize:13,marginBottom:14}}>{error}</div>}
-
-          <button onClick={handle} disabled={loading} style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:8,padding:"11px",fontWeight:700,cursor:loading?"not-allowed":"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1}}>
-            {loading
-              ?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A processar...</>
-              :mode==="login"
-                ?<><span className="material-icons-outlined" style={{fontSize:18}}>login</span>Entrar</>
-                :<><span className="material-icons-outlined" style={{fontSize:18}}>person_add</span>Criar conta</>
-            }
+          {error&&<div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:8,padding:"10px 14px",color:"#ef4444",fontSize:13,marginBottom:14}}>⚠️ {error}</div>}
+          <button onClick={handleLogin} disabled={loading} style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:8,padding:"11px",fontWeight:700,cursor:"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1}}>
+            {loading?<span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>:<span className="material-icons-outlined" style={{fontSize:18}}>login</span>}
+            {loading?"A entrar...":"Entrar"}
           </button>
+          <div style={{marginTop:20,padding:14,background:inp,borderRadius:10,border:`1px solid ${border}`}}>
+            <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Contas de demonstração</div>
+            {DEMO_USERS.map(u=>(
+              <div key={u.id} onClick={()=>{setEmail(u.email);setPass(u.password);}} style={{cursor:"pointer",padding:"6px 8px",borderRadius:6,marginBottom:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                onMouseEnter={e=>e.currentTarget.style.background=dark?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.03)"}
+                onMouseLeave={e=>e.currentTarget.style.background=""}>
+                <div><div style={{fontSize:13,fontWeight:600,color:text}}>{u.email}</div><div style={{fontSize:11,color:muted}}>{u.password} · Plano {u.plan}</div></div>
+                <span className="material-icons-outlined" style={{fontSize:16,color:muted}}>arrow_forward</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <p style={{textAlign:"center",fontSize:12,color:muted,marginTop:16}}>ImoPro © {new Date().getFullYear()}</p>
       </div>
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
@@ -855,68 +835,35 @@ const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",ico
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function ImoPro() {
-  const [session,   setSession]   = useState(undefined); // undefined=loading, null=logged out
-  const [profile,   setProfile]   = useState(null);
-  const [dark,      setDark]      = useState(false);
-  const [page,      setPage]      = useState("dashboard");
-  const [menuOpen,  setMenuOpen]  = useState(false);
-  const [contacts,    setContacts]    = useState([]);
-  const [properties,  setProperties]  = useState([]);
-  const [loading,   setLoading]   = useState(false);
-  const [search,    setSearch]    = useState("");
-  const [filterInt, setFilterInt] = useState("");
-  const [notif,     setNotif]     = useState(null);
-  const [editContact,   setEditContact]  = useState(null);
-  const [isNewContact,  setIsNewContact] = useState(false);
-  const [editProperty,  setEditProperty] = useState(null);
-  const [isNewProperty, setIsNewProperty]= useState(false);
-  const [sendProp,  setSendProp]  = useState(null);
-  const [showImport,setShowImport]= useState(false);
-  const [importPrev,setImportPrev]= useState([]);
-  const [importErr, setImportErr] = useState("");
-  const [isMobile,  setIsMobile]  = useState(window.innerWidth<768);
-  const [isTablet,  setIsTablet]  = useState(window.innerWidth<1024);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [dark, setDark]   = useState(false);
+  const [page, setPage]   = useState("dashboard");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [contacts,    setContacts]    = useState(MOCK_CONTACTS.map(c=>({...c,userId:1})));
+  const [properties,  setProperties]  = useState(MOCK_PROPERTIES.map(p=>({...p,userId:1})));
 
-  // ── Responsive listener ──
+  // Filtrar por utilizador actual
+  const myContacts   = contacts.filter(c=>c.userId===currentUser?.id);
+  const myProperties = properties.filter(p=>p.userId===currentUser?.id);
+  const [search,    setSearch]   = useState("");
+  const [filterInt, setFilterInt] = useState("");
+  const [notif,     setNotif]    = useState(null);
+  const [editContact,  setEditContact]  = useState(null);
+  const [isNewContact, setIsNewContact] = useState(false);
+  const [editProperty,  setEditProperty]  = useState(null);
+  const [isNewProperty, setIsNewProperty] = useState(false);
+  const [sendProp, setSendProp] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importPrev, setImportPrev] = useState([]);
+  const [importErr,  setImportErr]  = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth<768);
+  const [isTablet, setIsTablet] = useState(window.innerWidth<1024);
+
   useEffect(()=>{
     const h=()=>{setIsMobile(window.innerWidth<768);setIsTablet(window.innerWidth<1024);};
     window.addEventListener("resize",h); return()=>window.removeEventListener("resize",h);
   },[]);
 
-  // ── Auth listener ──
-  useEffect(()=>{
-    supabase.auth.getSession().then(({data:{session}})=>setSession(session));
-    const {data:{subscription}} = supabase.auth.onAuthStateChange((_,session)=>{
-      setSession(session);
-      if(!session){ setContacts([]); setProperties([]); setProfile(null); }
-    });
-    return ()=>subscription.unsubscribe();
-  },[]);
-
-  // ── Load profile + data when session changes ──
-  useEffect(()=>{
-    if(!session) return;
-    loadProfile();
-    loadContacts();
-    loadProperties();
-  },[session]);
-
-  const loadProfile = async()=>{
-    const {data} = await supabase.from("profiles").select("*").eq("id",session.user.id).single();
-    setProfile(data);
-  };
-
-  const loadContacts = async()=>{
-    const {data,error} = await supabase.from("contacts").select("*").eq("user_id",session.user.id).order("created_at",{ascending:false});
-    if(!error) setContacts(data||[]);
-  };
-
-  const loadProperties = async()=>{
-    const {data,error} = await supabase.from("properties").select("*").eq("user_id",session.user.id).order("created_at",{ascending:false});
-    if(!error) setProperties(data||[]);
-  };
-
-  // ── Theme ──
   const S = mkStyles(dark, isMobile);
   const {teal,bg,sidebar,card,border,text,muted,inp,inpB,hover,thead,navy,BTNP,CARD:mkCARD,INP:mkINP,TH:mkTH,TD:mkTD} = S;
   const BTNS = S.BTNS(inp,border,muted);
@@ -924,117 +871,24 @@ export default function ImoPro() {
   const INP  = mkINP(inp,inpB,text);
   const TH   = mkTH(muted,thead);
   const TD   = mkTD(text,border);
-  const theme = {...S,BTNP,BTNS:S.BTNS,INP:mkINP,CARD:mkCARD,TH:mkTH,TD:mkTD};
+  const theme = {...S, BTNP, BTNS:S.BTNS, INP:mkINP, CARD:mkCARD, TH:mkTH, TD:mkTD};
 
-  const showNotif = msg=>{setNotif(msg);setTimeout(()=>setNotif(null),3500);};
+  const showNotif = msg=>{setNotif(msg);setTimeout(()=>setNotif(null),3000);};
 
-  const getMatches = useCallback(p=>contacts.filter(c=>
+  const getMatches = useCallback(p=>myContacts.filter(c=>
     (c.interests||[]).includes(p.type)&&
     (!(c.typologies||[]).length||(c.typologies||[]).includes(p.typology))&&
     (!(c.concelhos||[]).length||(c.concelhos||[]).includes(p.concelho))
-  ),[contacts]);
+  ),[myContacts]);
 
   const getScore = (c,p)=>{ let s=0; if((c.interests||[]).includes(p.type))s++; if(!(c.typologies||[]).length||(c.typologies||[]).includes(p.typology))s++; if(!(c.concelhos||[]).length||(c.concelhos||[]).includes(p.concelho))s++; return Math.round(s/3*100); };
 
-  const filtered = contacts.filter(c=>{
-    const ms=c.name.toLowerCase().includes(search.toLowerCase())||(c.phone||"").includes(search);
+  const filtered = myContacts.filter(c=>{
+    const ms=c.name.toLowerCase().includes(search.toLowerCase())||c.phone.includes(search);
     const mi=filterInt?(c.interests||[]).includes(filterInt):true;
     return ms&&mi;
   });
 
-  // ── CRUD: Contacts ──
-  const saveContact = async()=>{
-    if(!editContact.name||!editContact.phone) return;
-    setLoading(true);
-    const payload = {
-      name:editContact.name, phone:editContact.phone, email:editContact.email||"",
-      interests:editContact.interests||[], typologies:editContact.typologies||[],
-      districts:editContact.districts||[], concelhos:editContact.concelhos||[],
-      freguesias:editContact.freguesias||[], price_range:editContact.priceRange||editContact.price_range||"",
-      status:editContact.status||"Frio", notes:editContact.notes||"",
-    };
-    let error;
-    if(isNewContact) {
-      ({error} = await supabase.from("contacts").insert({...payload,user_id:session.user.id}));
-    } else {
-      ({error} = await supabase.from("contacts").update(payload).eq("id",editContact.id));
-    }
-    if(!error){ await loadContacts(); setEditContact(null); showNotif(isNewContact?"Contacto adicionado!":"Contacto actualizado!"); }
-    else showNotif("Erro ao guardar: "+error.message);
-    setLoading(false);
-  };
-
-  const deleteContact = async()=>{
-    setLoading(true);
-    const {error} = await supabase.from("contacts").delete().eq("id",editContact.id);
-    if(!error){ await loadContacts(); setEditContact(null); showNotif("Contacto eliminado."); }
-    else showNotif("Erro ao eliminar: "+error.message);
-    setLoading(false);
-  };
-
-  // ── CRUD: Properties ──
-  const saveProperty = async()=>{
-    if(!editProperty.title||!editProperty.type) return;
-    setLoading(true);
-    const payload = {
-      title:editProperty.title, type:editProperty.type, typology:editProperty.typology||"",
-      district:editProperty.district||"", concelho:editProperty.concelho||"",
-      freguesia:editProperty.freguesia||"", price:Number(editProperty.price)||0,
-      area:Number(editProperty.area)||0, description:editProperty.description||"",
-      photos:editProperty.photos||[],
-    };
-    let error;
-    if(isNewProperty) {
-      ({error} = await supabase.from("properties").insert({...payload,user_id:session.user.id}));
-    } else {
-      ({error} = await supabase.from("properties").update(payload).eq("id",editProperty.id));
-    }
-    if(!error){ await loadProperties(); setEditProperty(null); showNotif(isNewProperty?"Imóvel adicionado!":"Imóvel actualizado!"); }
-    else showNotif("Erro ao guardar: "+error.message);
-    setLoading(false);
-  };
-
-  const deleteProperty = async()=>{
-    setLoading(true);
-    // Apagar fotos do storage
-    const photos = editProperty.photos||[];
-    if(photos.length>0){
-      const paths = photos.map(ph=>{
-        const url = ph.url||"";
-        const match = url.match(/property-photos\/(.+)$/);
-        return match?match[1]:null;
-      }).filter(Boolean);
-      if(paths.length>0) await supabase.storage.from("property-photos").remove(paths);
-    }
-    const {error} = await supabase.from("properties").delete().eq("id",editProperty.id);
-    if(!error){ await loadProperties(); setEditProperty(null); showNotif("Imóvel eliminado."); }
-    else showNotif("Erro ao eliminar: "+error.message);
-    setLoading(false);
-  };
-
-  // ── Photo upload to Supabase Storage ──
-  const handlePhotos = async(e)=>{
-    const files = Array.from(e.target.files);
-    e.target.value="";
-    const current = editProperty.photos||[];
-    const remaining = 10-current.length;
-    if(remaining<=0) return;
-    const toUpload = files.slice(0,remaining);
-    showNotif(`A carregar ${toUpload.length} foto${toUpload.length>1?"s"}...`);
-    const uploaded = await Promise.all(toUpload.map(async(file)=>{
-      const ext = file.name.split(".").pop();
-      const path = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const {error} = await supabase.storage.from("property-photos").upload(path, file, {contentType:file.type});
-      if(error) return null;
-      const {data:{publicUrl}} = supabase.storage.from("property-photos").getPublicUrl(path);
-      return {id:Date.now()+Math.random(), url:publicUrl, name:file.name};
-    }));
-    const ok = uploaded.filter(Boolean);
-    setEditProperty(p=>({...p, photos:[...(p.photos||[]),...ok].slice(0,10)}));
-    showNotif(`${ok.length} foto${ok.length>1?"s":""} carregada${ok.length>1?"s":""}!`);
-  };
-
-  // ── Import contacts ──
   const handleImportFile = e=>{
     const file=e.target.files[0]; if(!file)return; setImportErr("");
     const r=new FileReader();
@@ -1048,38 +902,42 @@ export default function ImoPro() {
     r.readAsText(file,"UTF-8"); e.target.value="";
   };
 
-  const confirmImport = async()=>{
-    const existing = contacts.map(c=>c.phone).filter(Boolean);
-    const newOnes = importPrev.filter(p=>!existing.includes(p.phone)).map(c=>({
-      user_id:session.user.id, name:c.name||"Sem nome", phone:c.phone||"",
-      email:c.email||"", interests:[], typologies:[], districts:[], concelhos:[],
-      freguesias:[], price_range:"", status:"Frio", notes:"",
-    }));
-    if(!newOnes.length){showNotif("Nenhum contacto novo para importar.");setShowImport(false);return;}
-    setLoading(true);
-    const {error} = await supabase.from("contacts").insert(newOnes);
-    if(!error){ await loadContacts(); setImportPrev([]); setShowImport(false); showNotif(`${newOnes.length} contactos importados!`); }
-    else showNotif("Erro na importação: "+error.message);
-    setLoading(false);
+  const saveContact = ()=>{
+    if(!editContact.name||!editContact.phone) return;
+    if(isNewContact) setContacts(cs=>[...cs,{...editContact,id:Date.now(),userId:currentUser.id}]);
+    else setContacts(cs=>cs.map(c=>c.id===editContact.id?editContact:c));
+    setEditContact(null); showNotif(isNewContact?"Contacto adicionado!":"Contacto actualizado!");
+  };
+
+  const deleteContact = ()=>{
+    setContacts(cs=>cs.filter(c=>c.id!==editContact.id));
+    setEditContact(null); showNotif("Contacto eliminado.");
+  };
+
+  const saveProperty = ()=>{
+    if(!editProperty.title||!editProperty.type) return;
+    const p={...editProperty,price:Number(editProperty.price),area:Number(editProperty.area)};
+    if(isNewProperty) setProperties(ps=>[...ps,{...p,id:Date.now(),userId:currentUser.id}]);
+    else setProperties(ps=>ps.map(x=>x.id===p.id?p:x));
+    setEditProperty(null); showNotif(isNewProperty?"Imóvel adicionado!":"Imóvel actualizado!");
+  };
+
+  const deleteProperty = ()=>{
+    setProperties(ps=>ps.filter(p=>p.id!==editProperty.id));
+    setEditProperty(null); showNotif("Imóvel eliminado.");
+  };
+
+  const handlePhotos = e=>{
+    const files=Array.from(e.target.files);
+    Promise.all(files.map(f=>new Promise(res=>{const r=new FileReader();r.onload=ev=>res({id:Date.now()+Math.random(),url:ev.target.result,name:f.name});r.readAsDataURL(f);}))).then(photos=>{
+      setEditProperty(p=>({...p,photos:[...(p.photos||[]),...photos].slice(0,10)}));
+    });
+    e.target.value="";
   };
 
   const PAGE_TITLE = {dashboard:"Início",contacts:"Contactos",properties:"Imóveis",matches:"Matches",campaigns:"Campanhas",social:"Redes Sociais"}[page];
-  const currentUser = profile ? {...profile, name: profile.name||session?.user?.email||"Utilizador"} : null;
 
-  // ── Loading inicial ──
-  if(session===undefined) return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f1f5f9",fontFamily:"Inter,sans-serif"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{width:56,height:56,background:"#3BB2A1",borderRadius:14,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
-          <span className="material-icons-outlined" style={{color:"#fff",fontSize:28}}>home_work</span>
-        </div>
-        <div style={{fontSize:14,color:"#64748b"}}>A carregar...</div>
-      </div>
-      <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
-    </div>
-  );
-
-  if(!session) return <LoginScreen dark={dark}/>;
+  if(!currentUser) return <LoginScreen onLogin={setCurrentUser} dark={dark}/>;
 
   return (
     <div style={{fontFamily:"'Inter',sans-serif",background:bg,minHeight:"100vh",color:text,transition:"all 0.2s"}}>
@@ -1090,9 +948,6 @@ export default function ImoPro() {
       {notif&&<div style={{position:"fixed",top:20,right:20,zIndex:1000,background:teal,color:"#fff",borderRadius:10,padding:"12px 20px",fontSize:14,fontWeight:600,boxShadow:"0 8px 24px rgba(59,178,161,0.35)",display:"flex",alignItems:"center",gap:8}}>
         <span className="material-icons-outlined" style={{fontSize:18}}>check_circle</span>{notif}
       </div>}
-
-      {loading&&<div style={{position:"fixed",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${teal},#4f46e5)`,zIndex:2000,animation:"progress 1s ease-in-out infinite"}}/>}
-      <style>{`@keyframes progress{0%{width:0%}50%{width:70%}100%{width:100%}}`}</style>
 
       {isMobile&&menuOpen&&<div onClick={()=>setMenuOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:150}}/>}
 
@@ -1130,12 +985,9 @@ export default function ImoPro() {
               {(!isTablet||isMobile)&&(dark?"Modo Claro":"Modo Escuro")}
             </button>
             {(!isTablet||isMobile)&&<div style={{display:"flex",alignItems:"center",gap:10,padding:"6px 12px"}}>
-              <div style={{width:30,height:30,borderRadius:"50%",background:teal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(currentUser?.name||"?")}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:600,color:text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser?.name||"..."}</div>
-                <div style={{fontSize:11,color:muted}}>{currentUser?.plan||"Starter"}</div>
-              </div>
-              <button onClick={()=>supabase.auth.signOut()} title="Sair" style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4,flexShrink:0}}>
+              <div style={{width:30,height:30,borderRadius:"50%",background:teal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(currentUser.name)}</div>
+              <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser.name}</div><div style={{fontSize:11,color:muted}}>Plano {currentUser.plan}</div></div>
+              <button onClick={()=>setCurrentUser(null)} title="Sair" style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4,flexShrink:0}}>
                 <span className="material-icons-outlined" style={{fontSize:18}}>logout</span>
               </button>
             </div>}
@@ -1144,6 +996,7 @@ export default function ImoPro() {
 
         {/* MAIN */}
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
+          {/* TOPBAR */}
           <header style={{height:60,background:sidebar,borderBottom:`1px solid ${border}`,padding:`0 ${isMobile?16:28}px`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,gap:10}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
               {isMobile&&<button onClick={()=>setMenuOpen(!menuOpen)} style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4}}>
@@ -1163,7 +1016,7 @@ export default function ImoPro() {
                 <button onClick={()=>{setEditContact({...EMPTY_C});setIsNewContact(true);}} style={{...BTNP,fontSize:13,padding:"8px 14px"}}>
                   <span className="material-icons-outlined" style={{fontSize:15}}>person_add</span>{!isMobile&&"Novo Contacto"}
                 </button>
-              </>}
+              </> }
               {page==="properties"&&<button onClick={()=>{setEditProperty({...EMPTY_P});setIsNewProperty(true);}} style={{...BTNP,fontSize:13,padding:"8px 14px"}}>
                 <span className="material-icons-outlined" style={{fontSize:15}}>add_home</span>{!isMobile&&"Novo Imóvel"}
               </button>}
@@ -1179,10 +1032,10 @@ export default function ImoPro() {
 
           <main style={{flex:1,overflowY:"auto",padding:isMobile?14:26}}>
 
-            {/* INÍCIO */}
+            {/* DASHBOARD */}
             {page==="dashboard"&&<div>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:isMobile?12:18,marginBottom:isMobile?16:26}}>
-                {[{label:"Contactos",value:contacts.length,icon:"people",color:"#3b82f6",sub:"Total"},{label:"Leads Quentes",value:contacts.filter(c=>c.status==="Quente").length,icon:"local_fire_department",color:"#ef4444",sub:"Prontos"},{label:"Imóveis",value:properties.length,icon:"apartment",color:teal,sub:"Em carteira"},{label:"Matches",value:properties.reduce((acc,p)=>acc+getMatches(p).length,0),icon:"auto_awesome",color:"#8b5cf6",sub:"Potenciais"}].map((st,i)=>(
+                {[{label:"Contactos",value:myContacts.length,icon:"people",color:"#3b82f6",sub:"+3 este mês"},{label:"Leads Quentes",value:myContacts.filter(c=>c.status==="Quente").length,icon:"local_fire_department",color:"#ef4444",sub:"Prontos"},{label:"Imóveis",value:myProperties.length,icon:"apartment",color:teal,sub:"Em carteira"},{label:"WhatsApp",value:12,icon:"chat",color:"#10b981",sub:"Esta semana"}].map((st,i)=>(
                   <div key={i} style={{...CARD,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                     <div><div style={{fontSize:10,color:muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6,fontWeight:600}}>{st.label}</div><div style={{fontSize:isMobile?26:32,fontWeight:700,color:st.color,lineHeight:1}}>{st.value}</div><div style={{fontSize:11,color:muted,marginTop:5}}>{st.sub}</div></div>
                     <div style={{width:38,height:38,borderRadius:9,background:`${st.color}18`,display:"flex",alignItems:"center",justifyContent:"center"}}><span className="material-icons-outlined" style={{color:st.color,fontSize:20}}>{st.icon}</span></div>
@@ -1195,29 +1048,27 @@ export default function ImoPro() {
                     <h3 style={{fontSize:15,fontWeight:700,color:text}}>Leads Quentes</h3>
                     <button onClick={()=>setPage("contacts")} style={{background:"none",border:"none",color:teal,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Ver todos →</button>
                   </div>
-                  {contacts.filter(c=>c.status==="Quente").slice(0,5).map(c=>(
+                  {myContacts.filter(c=>c.status==="Quente").map(c=>(
                     <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${border}`}}>
                       <div style={{width:34,height:34,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(c.name)}</div>
-                      <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{(c.interests||[]).join(", ")||"—"} · {(c.concelhos||[])[0]||"—"}</div></div>
+                      <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{(c.interests||[]).join(", ")} · {(c.concelhos||[])[0]||"—"}</div></div>
                       <Badge status={c.status}/>
                     </div>
                   ))}
-                  {!contacts.filter(c=>c.status==="Quente").length&&<div style={{textAlign:"center",padding:24,color:muted,fontSize:13}}>Sem leads quentes ainda.</div>}
                 </div>
                 <div style={CARD}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
                     <h3 style={{fontSize:15,fontWeight:700,color:text}}>Imóveis para Enviar</h3>
                     <button onClick={()=>setPage("properties")} style={{background:"none",border:"none",color:teal,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Ver todos →</button>
                   </div>
-                  {properties.slice(0,5).map(p=>{const ms=getMatches(p);return(
+                  {myProperties.map(p=>{const ms=getMatches(p);return(
                     <div key={p.id} style={{padding:"11px 0",borderBottom:`1px solid ${border}`}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title}</div><div style={{fontSize:12,color:muted,marginTop:2}}>{p.concelho||"—"} · {p.price?.toLocaleString("pt-PT")}€</div></div>
+                        <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:600,color:text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title}</div><div style={{fontSize:12,color:muted,marginTop:2}}>{p.concelho} · {p.price?.toLocaleString("pt-PT")}€</div></div>
                         <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:11,color:"#10b981",fontWeight:600,marginBottom:5}}>{ms.length} interessados</div><button onClick={()=>setSendProp(p)} style={{...BTNP,padding:"6px 12px",fontSize:12}}>Enviar</button></div>
                       </div>
                     </div>
                   );})}
-                  {!properties.length&&<div style={{textAlign:"center",padding:24,color:muted,fontSize:13}}>Sem imóveis ainda.</div>}
                 </div>
               </div>
             </div>}
@@ -1234,17 +1085,16 @@ export default function ImoPro() {
               {isMobile?(
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   {filtered.map(c=>(
-                    <div key={c.id} style={{...CARD,cursor:"pointer"}} onClick={()=>{setEditContact({...c,priceRange:c.price_range||c.priceRange||""});setIsNewContact(false);}}>
+                    <div key={c.id} style={{...CARD,cursor:"pointer"}} onClick={()=>{setEditContact({...c});setIsNewContact(false);}}>
                       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
                         <div style={{width:40,height:40,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(c.name)}</div>
                         <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,color:text}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{c.phone}</div></div>
                         <Badge status={c.status}/>
                       </div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>{(c.interests||[]).map(t=><span key={t} style={{padding:"2px 8px",borderRadius:20,fontSize:11,background:`${teal}18`,color:teal,fontWeight:600}}>{t}</span>)}</div>
-                      <div style={{fontSize:12,color:muted}}>📍 {(c.concelhos||[]).join(", ")||"—"} · 💶 {c.price_range||c.priceRange||"—"}</div>
+                      <div style={{fontSize:12,color:muted}}>📍 {(c.concelhos||[]).join(", ")||"—"} · 💶 {c.priceRange||"—"}</div>
                     </div>
                   ))}
-                  {!filtered.length&&<div style={{...CARD,textAlign:"center",padding:32,color:muted}}>Sem contactos ainda.<br/><button onClick={()=>{setEditContact({...EMPTY_C});setIsNewContact(true);}} style={{...BTNP,marginTop:16}}>Adicionar primeiro contacto</button></div>}
                 </div>
               ):(
                 <div style={{...CARD,padding:0,overflow:"hidden"}}>
@@ -1258,46 +1108,47 @@ export default function ImoPro() {
                             <div><div style={{fontWeight:600}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{c.phone}</div></div>
                           </div></td>
                           <td style={TD}><div style={{fontWeight:500}}>{(c.concelhos||[]).join(", ")||"—"}</div><div style={{fontSize:11,color:muted}}>{(c.districts||[]).join(", ")||""}</div></td>
-                          <td style={TD}><span style={{fontWeight:600}}>{c.price_range||c.priceRange||"—"}</span></td>
+                          <td style={TD}><span style={{fontWeight:600}}>{c.priceRange||"—"}</span></td>
                           <td style={TD}><div style={{display:"flex",flexWrap:"wrap",gap:3}}>{(c.interests||[]).map(t=><span key={t} style={{padding:"2px 7px",borderRadius:20,fontSize:11,background:`${teal}18`,color:teal,fontWeight:600}}>{t}</span>)}{!(c.interests||[]).length&&<span style={{color:muted,fontSize:12}}>—</span>}</div></td>
                           <td style={TD}><Badge status={c.status}/></td>
-                          <td style={{...TD,textAlign:"right"}}><button onClick={()=>{setEditContact({...c,priceRange:c.price_range||c.priceRange||""});setIsNewContact(false);}} style={{background:"none",border:"none",cursor:"pointer",padding:6,borderRadius:6,color:muted}}><span className="material-icons-outlined" style={{fontSize:18}}>edit</span></button></td>
+                          <td style={{...TD,textAlign:"right"}}><button onClick={()=>{setEditContact({...c});setIsNewContact(false);}} style={{background:"none",border:"none",cursor:"pointer",padding:6,borderRadius:6,color:muted}}><span className="material-icons-outlined" style={{fontSize:18}}>edit</span></button></td>
                         </tr>
                       ))}</tbody>
                     </table>
                   </div>
-                  <div style={{padding:"11px 18px",borderTop:`1px solid ${border}`,background:thead}}><span style={{fontSize:13,color:muted}}>A mostrar {filtered.length} de {contacts.length} contactos</span></div>
+                  <div style={{padding:"11px 18px",borderTop:`1px solid ${border}`,background:thead}}><span style={{fontSize:13,color:muted}}>A mostrar {filtered.length} de {myContacts.length} contactos</span></div>
                 </div>
               )}
             </div>}
 
             {/* IMÓVEIS */}
             {page==="properties"&&<div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":isTablet?"1fr 1fr":"repeat(auto-fill,minmax(360px,1fr))",gap:isMobile?14:20}}>
-              {properties.map(p=><PropCard key={p.id} p={p} matchCount={getMatches(p).length} isMobile={isMobile} theme={theme}
+              {myProperties.map(p=><PropCard key={p.id} p={p} matchCount={getMatches(p).length} isMobile={isMobile} theme={theme}
                 onEdit={()=>{setEditProperty({...p});setIsNewProperty(false);}}
                 onSend={()=>setSendProp(p)}/>)}
-              {!properties.length&&<div style={{...CARD,textAlign:"center",padding:40,color:muted,gridColumn:"1/-1"}}>Sem imóveis ainda.<br/><button onClick={()=>{setEditProperty({...EMPTY_P});setIsNewProperty(true);}} style={{...BTNP,marginTop:16}}>Adicionar primeiro imóvel</button></div>}
             </div>}
 
             {/* MATCHES */}
             {page==="matches"&&<div>
-              <p style={{color:muted,marginBottom:20,fontSize:14}}>Contactos filtrados automaticamente por imóvel.</p>
-              {[...properties].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(p=>{const ms=getMatches(p);return(
+              <p style={{color:muted,marginBottom:20,fontSize:14}}>Contactos filtrados automaticamente. Clica "Enviar" para abrir o WhatsApp directamente.</p>
+              {[...myProperties].sort((a,b)=>b.id-a.id).map(p=>{const ms=getMatches(p);return(
                 <div key={p.id} style={{...CARD,marginBottom:18}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
-                    <div><h3 style={{fontSize:15,fontWeight:700,color:text}}>{p.title}</h3><div style={{fontSize:13,color:muted,marginTop:2}}>{p.concelho||"—"} · {p.typology} · {p.price?.toLocaleString("pt-PT")}€</div></div>
+                    <div><h3 style={{fontSize:15,fontWeight:700,color:text}}>{p.title}</h3><div style={{fontSize:13,color:muted,marginTop:2}}>{p.concelho} · {p.typology} · {p.price?.toLocaleString("pt-PT")}€</div></div>
                     <button onClick={()=>setSendProp(p)} style={BTNP}><span className="material-icons-outlined" style={{fontSize:16}}>chat</span>Ver {ms.length} contactos</button>
                   </div>
                   {ms.length===0?(<div style={{textAlign:"center",padding:24,color:muted,fontSize:14,background:inp,borderRadius:10}}>Nenhum contacto com este perfil.</div>):(
                     isMobile?(
-                      <div>{ms.map(c=>{const sc=getScore(c,p),scC=sc>=80?"#10b981":sc>=60?"#f59e0b":"#ef4444";return(
-                        <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${border}`}}>
-                          <div style={{width:32,height:32,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff"}}>{initials(c.name)}</div>
-                          <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{c.name}</div><div style={{fontSize:11,color:muted}}>{(c.concelhos||[]).join(", ")}</div></div>
-                          <span style={{fontSize:12,fontWeight:700,color:scC}}>{sc}%</span>
-                          <button onClick={()=>setSendProp(p)} style={{...BTNP,padding:"6px 10px",fontSize:11}}><span className="material-icons-outlined" style={{fontSize:13}}>chat</span></button>
-                        </div>
-                      );})}</div>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {ms.map(c=>{const sc=getScore(c,p),scC=sc>=80?"#10b981":sc>=60?"#f59e0b":"#ef4444";return(
+                          <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${border}`}}>
+                            <div style={{width:32,height:32,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff"}}>{initials(c.name)}</div>
+                            <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{c.name}</div><div style={{fontSize:11,color:muted}}>{(c.concelhos||[]).join(", ")}</div></div>
+                            <span style={{fontSize:12,fontWeight:700,color:scC}}>{sc}%</span>
+                            <button onClick={()=>setSendProp(p)} style={{...BTNP,padding:"6px 10px",fontSize:11}}><span className="material-icons-outlined" style={{fontSize:13}}>chat</span></button>
+                          </div>
+                        );})}
+                      </div>
                     ):(
                       <table style={{width:"100%",borderCollapse:"collapse"}}>
                         <thead><tr><th style={TH}>Contacto</th><th style={TH}>Preferências</th><th style={TH}>Budget</th><th style={{...TH,textAlign:"center"}}>Score</th><th style={{...TH,textAlign:"right"}}>Acção</th></tr></thead>
@@ -1305,32 +1156,46 @@ export default function ImoPro() {
                           <tr key={c.id}>
                             <td style={TD}><div style={{display:"flex",alignItems:"center",gap:9}}><div style={{width:30,height:30,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>{initials(c.name)}</div><div><div style={{fontWeight:600,fontSize:13}}>{c.name}</div><div style={{fontSize:11,color:muted}}>{c.phone}</div></div></div></td>
                             <td style={TD}><span style={{color:muted,fontSize:12}}>{(c.typologies||[]).join(", ")||"—"} · {(c.concelhos||[]).join(", ")||"—"}</span></td>
-                            <td style={TD}><span style={{fontWeight:600,fontSize:13}}>{c.price_range||c.priceRange||"—"}</span></td>
+                            <td style={TD}><span style={{fontWeight:600,fontSize:13}}>{c.priceRange||"—"}</span></td>
                             <td style={{...TD,textAlign:"center"}}><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><div style={{width:48,height:5,background:border,borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:`${sc}%`,background:scC,borderRadius:4}}/></div><span style={{fontSize:11,fontWeight:700,color:scC}}>{sc}%</span></div></td>
                             <td style={{...TD,textAlign:"right"}}><button onClick={()=>setSendProp(p)} style={{...BTNP,padding:"6px 12px",fontSize:12}}><span className="material-icons-outlined" style={{fontSize:14}}>chat</span>Enviar</button></td>
                           </tr>
-                        );})}</tbody>
+                        );})}
+                        </tbody>
                       </table>
                     )
                   )}
                 </div>
               );})}
-              {!properties.length&&<div style={{...CARD,textAlign:"center",padding:40,color:muted}}>Adiciona imóveis para ver os matches.</div>}
             </div>}
 
             {/* CAMPANHAS */}
             {page==="campaigns"&&<div>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:isMobile?12:16,marginBottom:20}}>
-                {[["Enviados","0","#3b82f6","send"],["Entregues","0","#10b981","done_all"],["Visualizados","0",teal,"visibility"],["Respostas","0","#f59e0b","reply"]].map(([l,val,c,ic])=>(
+                {[["Enviados","12","#3b82f6","send"],["Entregues","11","#10b981","done_all"],["Visualizados","8",teal,"visibility"],["Respostas","3","#f59e0b","reply"]].map(([l,val,c,ic])=>(
                   <div key={l} style={{...CARD,display:"flex",gap:12,alignItems:"center"}}>
                     <div style={{width:40,height:40,borderRadius:9,background:`${c}18`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span className="material-icons-outlined" style={{color:c,fontSize:20}}>{ic}</span></div>
                     <div><div style={{fontSize:10,color:muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em"}}>{l}</div><div style={{fontSize:26,fontWeight:700,color:c}}>{val}</div></div>
                   </div>
                 ))}
               </div>
-              <div style={{...CARD,textAlign:"center",padding:40,color:muted}}>
-                <span className="material-icons-outlined" style={{fontSize:40,display:"block",marginBottom:12}}>bar_chart</span>
-                Histórico de campanhas em breve.
+              <div style={CARD}>
+                <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:16}}>Histórico</h3>
+                {isMobile?(
+                  <div>{[["04 Mar 2025","Apt T2 Cascais","WhatsApp","12"],["28 Fev 2025","Moradia T4 Sintra","WhatsApp","5"],["20 Fev 2025","Apt T1 Lisboa","Instagram","18"]].map(([d,pr,ch,n],i)=>(
+                    <div key={i} style={{padding:"12px 0",borderBottom:`1px solid ${border}`}}>
+                      <div style={{fontWeight:600,fontSize:14,color:text}}>{pr}</div>
+                      <div style={{fontSize:12,color:muted,marginTop:4}}>{d} · <span style={{padding:"2px 8px",borderRadius:20,fontSize:11,background:`${teal}18`,color:teal,fontWeight:600}}>{ch}</span> · {n} envios</div>
+                    </div>
+                  ))}</div>
+                ):(
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead><tr><th style={TH}>Data</th><th style={TH}>Imóvel</th><th style={TH}>Canal</th><th style={TH}>Envios</th></tr></thead>
+                    <tbody>{[["04 Mar 2025","Apt T2 Cascais","WhatsApp","12"],["28 Fev 2025","Moradia T4 Sintra","WhatsApp","5"],["20 Fev 2025","Apt T1 Lisboa","Instagram","18"]].map(([d,pr,ch,n],i)=>(
+                      <tr key={i}><td style={TD}>{d}</td><td style={{...TD,fontWeight:600}}>{pr}</td><td style={TD}><span style={{padding:"3px 9px",borderRadius:20,fontSize:11,background:`${teal}18`,color:teal,fontWeight:600}}>{ch}</span></td><td style={TD}>{n}</td></tr>
+                    ))}</tbody>
+                  </table>
+                )}
               </div>
             </div>}
 
@@ -1364,7 +1229,7 @@ export default function ImoPro() {
       {/* MODALS */}
       {editContact&&<ContactForm contact={editContact} setContact={setEditContact} onSave={saveContact} onDelete={deleteContact} onClose={()=>setEditContact(null)} isNew={isNewContact} isMobile={isMobile} theme={theme}/>}
       {editProperty&&<PropertyForm property={editProperty} setProperty={setEditProperty} onSave={saveProperty} onDelete={deleteProperty} onClose={()=>setEditProperty(null)} isNew={isNewProperty} isMobile={isMobile} theme={theme} onPhotos={handlePhotos}/>}
-      {sendProp&&<SendModal property={sendProp} contacts={contacts} onClose={()=>setSendProp(null)} isMobile={isMobile} theme={theme}/>}
+      {sendProp&&<SendModal property={sendProp} contacts={myContacts} onClose={()=>setSendProp(null)} isMobile={isMobile} theme={theme}/>}
 
       {/* IMPORT MODAL */}
       {showImport&&(
@@ -1401,9 +1266,7 @@ export default function ImoPro() {
           </div>}
           <div style={{display:"flex",gap:10,marginTop:16}}>
             <button onClick={()=>setShowImport(false)} style={{...BTNS,flex:1,justifyContent:"center"}}>Cancelar</button>
-            {importPrev.length>0&&<button onClick={confirmImport} disabled={loading} style={{...BTNP,flex:2,justifyContent:"center",opacity:loading?0.7:1}}>
-              {loading?"A importar...":"Importar "+importPrev.length+" contactos"}
-            </button>}
+            {importPrev.length>0&&<button onClick={()=>{const n=importPrev.filter(p=>!myContacts.find(c=>c.phone&&c.phone===p.phone)).map(c=>({...c,userId:currentUser.id}));setContacts([...contacts,...n]);setImportPrev([]);setShowImport(false);showNotif(`${n.length} contactos importados!`);}} style={{...BTNP,flex:2,justifyContent:"center"}}>Importar {importPrev.length} contactos</button>}
           </div>
         </AppModal>
       )}
