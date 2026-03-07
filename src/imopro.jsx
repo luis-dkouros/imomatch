@@ -1241,6 +1241,31 @@ export default function App() {
   );
 }
 
+// ─── THEME HELPER ─────────────────────────────────────────────────────────────
+function mkStyles(dark, isMobile) {
+  const teal   = "#0d9488";
+  const navy   = dark ? "#0f172a" : "#1e3a5f";
+  const bg     = dark ? "#0f172a" : "#f0f4f8";
+  const sidebar= dark ? "#1e293b" : "#1e3a5f";
+  const card   = dark ? "#1e293b" : "#ffffff";
+  const border = dark ? "#334155" : "#e2e8f0";
+  const text   = dark ? "#f1f5f9" : "#1e293b";
+  const muted  = dark ? "#94a3b8" : "#64748b";
+  const inp    = dark ? "#0f172a" : "#f8fafc";
+  const inpB   = dark ? "#334155" : "#e2e8f0";
+  const hover  = dark ? "#334155" : "#f1f5f9";
+  const thead  = dark ? "#0f172a" : "#f8fafc";
+
+  const BTNP = {background:teal,color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontWeight:600,cursor:"pointer",fontSize:14,fontFamily:"inherit",display:"flex",alignItems:"center",gap:6};
+  const BTNS = (inp,border,muted) => ({background:inp,color:muted,border:`1px solid ${border}`,borderRadius:8,padding:"8px 16px",fontWeight:600,cursor:"pointer",fontSize:14,fontFamily:"inherit",display:"flex",alignItems:"center",gap:6});
+  const CARD = (card,border) => ({background:card,border:`1px solid ${border}`,borderRadius:12,padding:16});
+  const INP  = (inp,inpB,text) => ({background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"8px 12px",color:text,fontSize:14,fontFamily:"inherit",width:"100%",boxSizing:"border-box"});
+  const TH   = (muted,thead) => ({background:thead,color:muted,padding:"10px 14px",textAlign:"left",fontSize:12,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"});
+  const TD   = (text,border) => ({padding:"12px 14px",color:text,borderBottom:`1px solid ${border}`,fontSize:14,verticalAlign:"middle"});
+
+  return {teal,navy,bg,sidebar,card,border,text,muted,inp,inpB,hover,thead,BTNP,BTNS,CARD,INP,TH,TD};
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function ImoPro() {
   const [session,   setSession]   = useState(undefined); // undefined=loading, null=logged out
