@@ -1828,7 +1828,7 @@ function ImoPro() {
                 <span className="material-icons-outlined" style={{fontSize:40,display:"block",marginBottom:12}}>bar_chart</span>
                 Histórico de campanhas em breve.
               </div>
-              </div>}
+              </div>
             </div>}
 
             {/* BILLING */}
@@ -1971,7 +1971,7 @@ function ImoPro() {
                   <div style={{fontSize:14,color:muted}}>Ligue pelo menos uma rede social para começar</div>
                 </div>
               </div>
-              </div>}
+              </div>
             </div>}
 
           </main>
