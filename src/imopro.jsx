@@ -861,57 +861,7 @@ const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",ico
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 // ─── PROPERTY LANDING PAGE ────────────────────────────────────────────────────
-function PropertyPage() {
-  const { id } = useParams();
-  const [property, setProperty] = useState(null);
-  const [agent, setAgent] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [activePhoto, setActivePhoto] = useState(0);
-  const [activeSection, setActiveSection] = useState("gallery");
-  const teal = "#3BB2A1";
-  const navy = "#112D4E";
-
-  useEffect(()=>{
-    supabase.from("properties").select("*").eq("id", id).single()
-      .then(({data, error})=>{
-        if(!error && data){
-          setProperty(data);
-          supabase.from("profiles").select("*").eq("id", data.user_id).single()
-            .then(({data:ag})=>{ if(ag) setAgent(ag); });
-        }
-        setLoading(false);
-      });
-  },[id]);
-
-  if(loading) return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f8fafc",fontFamily:"Inter,sans-serif"}}>
-      <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
-      <div style={{textAlign:"center"}}>
-        <img src={LOGO_URL} alt="ImoMatch" style={{height:48,marginBottom:20}}/>
-        <div style={{fontSize:14,color:"#64748b"}}>A carregar...</div>
-      </div>
-    </div>
-  );
-  if(!property) return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f8fafc",fontFamily:"Inter,sans-serif"}}>
-      <div style={{textAlign:"center",color:"#64748b"}}>
-        <span className="material-icons-outlined" style={{fontSize:48,display:"block",marginBottom:12}}>home</span>
-        Imóvel não encontrado.
-      </div>
-    </div>
-  );
-
-  const photos = property.photos || [];
-  const location = [property.freguesia, property.concelho, property.district].filter(Boolean).join(", ") || "Portugal";
-  const waMsg = encodeURIComponent(`Olá ${agent?.name||""}! Tenho interesse no imóvel: ${property.title} - ${window.location.href}`);
-  const waLink = agent?.phone ? `https://wa.me/${agent.phone.replace(/[^0-9]/g,"")}?text=${waMsg}` : `https://wa.me/?text=${waMsg}`;
-  const navItems = [{id:"gallery",label:"Galeria"},{id:"details",label:"Detalhes"},{id:"location",label:"Localização"},{id:"agent",label:"Agente"}];
-
-  return (
-    <div style={{fontFamily:"'Inter',sans-serif",background:"#f8fafc",minHeight:"100vh"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-      <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
-      <style>{`*{box-sizing:border-box;margin:0;padding:0}a{text-decoration:none}`}</style>
+:0;padding:0}a{text-decoration:none}`}</style>
 
       {/* Sticky Nav */}
       <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(10px)",borderBottom:"1px solid #e2e8f0",padding:"0 24px",display:"flex",alignItems:"center",height:60,gap:24}}>
@@ -1243,10 +1193,10 @@ export default function App() {
 
 // ─── THEME HELPER ─────────────────────────────────────────────────────────────
 function mkStyles(dark, isMobile) {
-  const teal   = "#0d9488";
-  const navy   = dark ? "#0f172a" : "#1e3a5f";
-  const bg     = dark ? "#0f172a" : "#f0f4f8";
-  const sidebar= dark ? "#1e293b" : "#1e3a5f";
+  const teal   = "#3BB2A1";
+  const navy   = dark ? "#0f172a" : "#112D4E";
+  const bg     = dark ? "#0f172a" : "#f1f5f9";
+  const sidebar= dark ? "#1e293b" : "#112D4E";
   const card   = dark ? "#1e293b" : "#ffffff";
   const border = dark ? "#334155" : "#e2e8f0";
   const text   = dark ? "#f1f5f9" : "#1e293b";
