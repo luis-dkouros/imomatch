@@ -664,7 +664,7 @@ function PropertyForm({property, setProperty, onSave, onClose, onDelete, isNew, 
 }
 
 // ─── SEND MODAL ───────────────────────────────────────────────────────────────
-function SendModal({property, contacts, onClose, isMobile, theme}) {
+function SendModal({property, contacts, session, onClose, isMobile, theme}) {
   const photoCount = (property?.photos||[]).length;
   const propUrl = property ? `${window.location.origin}/imovel/${property.id}` : "";
   const [msg, setMsg] = useState(property?`Olá {nome}! Tenho um imóvel que pode ser do seu interesse: ${property.title} por ${property.price?.toLocaleString("pt-PT")}€.\n🔗 Ver fotos e detalhes: ${propUrl}\nTem interesse em saber mais?`:"");
@@ -674,7 +674,30 @@ function SendModal({property, contacts, onClose, isMobile, theme}) {
   const BTNS = mkBTNS(inp,border,muted);
   const matches = property?contacts.filter(c=>(c.interests||[]).includes(property.type)&&(!(c.typologies||[]).length||(c.typologies||[]).includes(property.typology))&&(!(c.concelhos||[]).length||(c.concelhos||[]).includes(property.concelho))):[];
   const getScore = c => { let s=0; if((c.interests||[]).includes(property.type))s++; if(!(c.typologies||[]).length||(c.typologies||[]).includes(property.typology))s++; if(!(c.concelhos||[]).length||(c.concelhos||[]).includes(property.concelho))s++; return Math.round(s/3*100); };
-  const sendOne = c => { const phone=c.phone.replace(/\D/g,""); const m=encodeURIComponent(msg.replace(/\{nome\}/g,c.name.split(" ")[0])); window.open(`https://wa.me/${phone}?text=${m}`,"_blank"); setSentIds(p=>[...p,c.id]); };
+
+  // Load previously sent contacts from Supabase
+  useEffect(()=>{
+    if(!property||!session) return;
+    supabase.from("whatsapp_sent")
+      .select("contact_id")
+      .eq("property_id", property.id)
+      .eq("user_id", session.user.id)
+      .then(({data})=>{ if(data) setSentIds(data.map(r=>r.contact_id)); });
+  },[property, session]);
+
+  const sendOne = async c => {
+    const phone=c.phone.replace(/\D/g,"");
+    const m=encodeURIComponent(msg.replace(/\{nome\}/g,c.name.split(" ")[0]));
+    window.open(`https://wa.me/${phone}?text=${m}`,"_blank");
+    setSentIds(p=>[...p,c.id]);
+    // Save to Supabase
+    await supabase.from("whatsapp_sent").upsert({
+      property_id: property.id,
+      contact_id: c.id,
+      user_id: session.user.id,
+      sent_at: new Date().toISOString()
+    });
+  };
   if(!property) return null;
   return (
     <AppModal onClose={onClose} title="Enviar via WhatsApp" wide isMobile={isMobile} card={card} border={border} text={text} muted={muted}>
@@ -766,6 +789,61 @@ function PropCard({p, onEdit, onSend, onToggleSelect, selected, matchCount, isMo
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── PROFILE MODAL ────────────────────────────────────────────────────────────
+function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
+  const {teal,text,muted,inp,inpB,border,card,BTNP,BTNS:mkBTNS,INP:mkINP} = theme;
+  const INP = mkINP(inp,inpB,text);
+  const BTNS = mkBTNS(inp,border,muted);
+  const [name,  setName]  = useState(profile?.name||"");
+  const [phone, setPhone] = useState(profile?.phone||"");
+  const [bio,   setBio]   = useState(profile?.bio||"");
+  const [agency,setAgency]= useState(profile?.agency||"");
+  const [loading,setLoading] = useState(false);
+  const [error,  setError]   = useState("");
+
+  const save = async () => {
+    if(!name.trim()){ setError("O nome é obrigatório."); return; }
+    setLoading(true); setError("");
+    const updates = { id: session.user.id, name: name.trim(), phone: phone.trim(), bio: bio.trim(), agency: agency.trim(), updated_at: new Date().toISOString() };
+    const { data, error: err } = await supabase.from("profiles").upsert(updates).select().single();
+    setLoading(false);
+    if(err) { setError("Erro ao guardar: "+err.message); return; }
+    onSaved(data);
+    onClose();
+  };
+
+  return (
+    <AppModal onClose={onClose} title="Editar Perfil" isMobile={isMobile} card={card} border={border} text={text} muted={muted}>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {error&&<div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:8,padding:"10px 14px",color:"#ef4444",fontSize:13}}>{error}</div>}
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Nome *</div>
+          <input value={name} onChange={e=>setName(e.target.value)} placeholder="O teu nome" style={{...INP,width:"100%"}}/>
+        </div>
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Telefone (WhatsApp)</div>
+          <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+351 9XX XXX XXX" style={{...INP,width:"100%"}}/>
+        </div>
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Agência / Empresa</div>
+          <input value={agency} onChange={e=>setAgency(e.target.value)} placeholder="Nome da agência" style={{...INP,width:"100%"}}/>
+        </div>
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Bio / Apresentação</div>
+          <textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder="Breve descrição sobre ti..." style={{...INP,resize:"vertical",width:"100%"}} rows={3}/>
+        </div>
+        <div style={{fontSize:12,color:muted}}>Email: {session?.user?.email}</div>
+        <div style={{display:"flex",gap:10,marginTop:4}}>
+          <button onClick={save} disabled={loading} style={{...BTNP,flex:1,justifyContent:"center",opacity:loading?0.7:1}}>
+            {loading?"A guardar...":"Guardar Perfil"}
+          </button>
+          <button onClick={onClose} style={{...BTNS,flex:1,justifyContent:"center"}}>Cancelar</button>
+        </div>
+      </div>
+    </AppModal>
   );
 }
 
@@ -862,7 +940,8 @@ function LoginScreen({dark}) {
 }
 
 const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"}];
-const PLAN_LIMITS={free:{contacts:10,properties:2},basic:{contacts:Infinity,properties:Infinity}};
+const PLAN_LIMITS={trial:{contacts:Infinity,properties:Infinity},basic:{contacts:Infinity,properties:Infinity}};
+const TRIAL_DAYS=3;
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
 const STRIPE_PORTAL=process.env.REACT_APP_STRIPE_PORTAL||"https://billing.stripe.com/p/login/YOUR_PORTAL_LINK";
 function openStripeCheckout(userId, email) {
@@ -1408,9 +1487,13 @@ function ImoPro() {
     return ms&&mi;
   });
 
-  const userPlan=(profile?.plan||"free").toLowerCase();
-  const planLimits=PLAN_LIMITS[userPlan]||PLAN_LIMITS.free;
-  const isBasic=userPlan==="basic";
+  const userPlan=(profile?.plan||"trial").toLowerCase();
+  const trialStart = profile?.created_at ? new Date(profile.created_at) : new Date();
+  const trialDaysLeft = Math.max(0, TRIAL_DAYS - Math.floor((new Date()-trialStart)/(1000*60*60*24)));
+  const isTrialActive = userPlan==="trial" && trialDaysLeft>0;
+  const isBasic = userPlan==="basic";
+  const hasAccess = isBasic || isTrialActive;
+  const planLimits = PLAN_LIMITS[hasAccess?"basic":"trial"];
 
   // ── CRUD: Contacts ──
   const saveContact = async()=>{
@@ -1598,8 +1681,8 @@ function ImoPro() {
           </div>
           <nav style={{flex:1,padding:"12px 8px",display:"flex",flexDirection:"column",gap:2,overflowY:"auto"}}>
             {NAV_ITEMS.map(({id,icon,label})=>{
-              const isLocked=!isBasic&&(id==="campaigns"||id==="social");
-              const isBillingAlert=id==="billing"&&!isBasic&&(contacts.length>=8||properties.length>=1);
+              const isLocked=!hasAccess&&(id==="campaigns"||id==="social");
+              const isBillingAlert=id==="billing"&&!hasAccess&&(contacts.length>=8||properties.length>=1);
               const active=page===id;
               return (
                 <button key={id} onClick={()=>{setPage(id);if(isMobile)setMenuOpen(false);}} title={isTablet&&!isMobile?label:""}
@@ -1623,7 +1706,7 @@ function ImoPro() {
               <div style={{width:30,height:30,borderRadius:"50%",background:teal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(currentUser?.name||"?")}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:600,color:text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser?.name||"..."}</div>
-                <div style={{fontSize:11,color:isBasic?teal:muted,fontWeight:isBasic?700:400}}>{isBasic?"✦ Basic":"Plano Grátis"}</div>
+                <div style={{fontSize:11,color:isBasic?teal:isTrialActive?"#f59e0b":"#ef4444",fontWeight:hasAccess?700:400}}>{isBasic?"✦ Basic":isTrialActive?`🕐 Trial (${trialDaysLeft}d)`:"⚠️ Expirado"}</div>
               </div>
               <button onClick={()=>setShowProfileModal(true)} title="Editar perfil" style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4,flexShrink:0}}>
                 <span className="material-icons-outlined" style={{fontSize:18}}>edit</span>
@@ -1697,8 +1780,11 @@ function ImoPro() {
             {/* INÍCIO */}
             {page==="dashboard"&&<div>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:isMobile?12:18,marginBottom:isMobile?16:26}}>
-                {[{label:"Contactos",value:contacts.length,icon:"people",color:"#3b82f6",sub:"Total"},{label:"Leads Quentes",value:contacts.filter(c=>c.status==="Quente").length,icon:"local_fire_department",color:"#ef4444",sub:"Prontos"},{label:"Imóveis",value:properties.length,icon:"apartment",color:teal,sub:"Em carteira"},{label:"Matches",value:properties.reduce((acc,p)=>acc+getMatches(p).length,0),icon:"auto_awesome",color:"#8b5cf6",sub:"Potenciais"}].map((st,i)=>(
-                  <div key={i} style={{...CARD,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                {[{label:"Contactos",value:contacts.length,icon:"people",color:"#3b82f6",sub:"Total",page:"contacts"},{label:"Leads Quentes",value:contacts.filter(c=>c.status==="Quente").length,icon:"local_fire_department",color:"#ef4444",sub:"Prontos",page:"contacts"},{label:"Imóveis",value:properties.length,icon:"apartment",color:teal,sub:"Em carteira",page:"properties"},{label:"Matches",value:properties.reduce((acc,p)=>acc+getMatches(p).length,0),icon:"auto_awesome",color:"#8b5cf6",sub:"Potenciais",page:"matches"}].map((st,i)=>(
+                  <div key={i} onClick={()=>setPage(st.page)} style={{...CARD,display:"flex",justifyContent:"space-between",alignItems:"flex-start",cursor:"pointer",transition:"transform 0.15s,box-shadow 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,0.1)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow="";}}>
+
                     <div><div style={{fontSize:10,color:muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6,fontWeight:600}}>{st.label}</div><div style={{fontSize:isMobile?26:32,fontWeight:700,color:st.color,lineHeight:1}}>{st.value}</div><div style={{fontSize:11,color:muted,marginTop:5}}>{st.sub}</div></div>
                     <div style={{width:38,height:38,borderRadius:9,background:`${st.color}18`,display:"flex",alignItems:"center",justifyContent:"center"}}><span className="material-icons-outlined" style={{color:st.color,fontSize:20}}>{st.icon}</span></div>
                   </div>
@@ -1843,7 +1929,7 @@ function ImoPro() {
 
             {/* CAMPANHAS */}
             {page==="campaigns"&&<div>
-              {!isBasic&&<div style={{background:`${teal}11`,border:`1px solid ${teal}33`,borderRadius:14,padding:16,marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              {!hasAccess&&<div style={{background:`${teal}11`,border:`1px solid ${teal}33`,borderRadius:14,padding:16,marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                 <span className="material-icons-outlined" style={{color:teal,fontSize:22}}>lock</span>
                 <div style={{flex:1,minWidth:200}}>
                   <div style={{fontSize:13,fontWeight:700,color:text}}>Funcionalidade do Plano Basic</div>
@@ -1851,7 +1937,7 @@ function ImoPro() {
                 </div>
                 <button onClick={()=>setShowUpgrade({reason:"feature",label:"Campanhas"})} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Ver Planos</button>
               </div>}
-              <div style={{opacity:isBasic?1:0.35,pointerEvents:isBasic?"auto":"none"}}>
+              <div style={{opacity:hasAccess?1:0.35,pointerEvents:hasAccess?"auto":"none"}}>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:isMobile?12:16,marginBottom:20}}>
                 {[["Enviados","0","#3b82f6","send"],["Entregues","0","#10b981","done_all"],["Visualizados","0",teal,"visibility"],["Respostas","0","#f59e0b","reply"]].map(([l,val,c,ic])=>(
                   <div key={l} style={{...CARD,display:"flex",gap:12,alignItems:"center"}}>
@@ -1870,108 +1956,70 @@ function ImoPro() {
             {/* BILLING */}
             {page==="billing"&&<div>
               {/* Current Plan Banner */}
-              <div style={{...CARD,marginBottom:20,background:isBasic?`${teal}11`:card,border:`1px solid ${isBasic?teal:border}`,borderRadius:16}}>
+              <div style={{...CARD,marginBottom:20,background:isBasic?`${teal}11`:isTrialActive?`#f59e0b11`:card,border:`1px solid ${isBasic?teal:isTrialActive?"#f59e0b":border}`,borderRadius:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
                   <div>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                      <span style={{fontSize:22}}>{isBasic?"⭐":"🆓"}</span>
-                      <div style={{fontSize:20,fontWeight:800,color:text}}>Plano {isBasic?"Basic":"Grátis"}</div>
-                      <div style={{background:isBasic?teal:"#94a3b8",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{isBasic?"ACTIVO":"FREE"}</div>
+                      <span style={{fontSize:22}}>{isBasic?"⭐":isTrialActive?"🕐":"⚠️"}</span>
+                      <div style={{fontSize:20,fontWeight:800,color:text}}>Plano {isBasic?"Basic":isTrialActive?"Trial":"Expirado"}</div>
+                      <div style={{background:isBasic?teal:isTrialActive?"#f59e0b":"#ef4444",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{isBasic?"ACTIVO":isTrialActive?`${trialDaysLeft} DIA${trialDaysLeft!==1?"S":""} RESTANTE${trialDaysLeft!==1?"S":""}`:"EXPIRADO"}</div>
                     </div>
                     <div style={{fontSize:13,color:muted}}>
-                      {isBasic?"Acesso completo a todas as funcionalidades.":"Plano gratuito com funcionalidades limitadas."}
+                      {isBasic?"Acesso completo a todas as funcionalidades.":isTrialActive?`Trial gratuito de ${TRIAL_DAYS} dias. Faz upgrade para continuar.`:"O teu trial expirou. Subscreve o plano Basic para continuar."}
                     </div>
                   </div>
                   {isBasic?(
-                    <button
-                      onClick={()=>window.open(STRIPE_PORTAL,"_blank")}
-                      style={{background:inp,color:muted,border:`1px solid ${border}`,borderRadius:8,padding:"9px 16px",fontWeight:600,cursor:"pointer",fontSize:13,fontFamily:"inherit",whiteSpace:"nowrap"}}
-                    >Gerir Subscrição</button>
+                    <button onClick={()=>window.open(STRIPE_PORTAL,"_blank")} style={{background:inp,color:muted,border:`1px solid ${border}`,borderRadius:8,padding:"9px 16px",fontWeight:600,cursor:"pointer",fontSize:13,fontFamily:"inherit",whiteSpace:"nowrap"}}>Gerir Subscrição</button>
                   ):(
-                    <button
-                      onClick={()=>{
-                        const email=session?.user?.email||"";
-                        openStripeCheckout(session?.user?.id, session?.user?.email);
-                      }}
-                      style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"10px 20px",fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit",whiteSpace:"nowrap"}}
-                    >⬆ Fazer Upgrade</button>
+                    <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email)} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"10px 20px",fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit",whiteSpace:"nowrap"}}>⬆ Subscrever Basic</button>
                   )}
                 </div>
-                {!isBasic&&(
-                  <div style={{marginTop:16,display:"flex",gap:16,flexWrap:"wrap"}}>
-                    <div style={{flex:1,minWidth:140}}>
-                      <div style={{fontSize:12,color:muted,marginBottom:4}}>Contactos</div>
-                      <div style={{height:6,background:border,borderRadius:3,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:`${Math.min(contacts.length/10*100,100)}%`,background:contacts.length>=10?"#ef4444":teal,borderRadius:3,transition:"width 0.3s"}}/>
-                      </div>
-                      <div style={{fontSize:12,marginTop:3,color:contacts.length>=10?"#ef4444":muted}}>{contacts.length}/10 contactos</div>
-                    </div>
-                    <div style={{flex:1,minWidth:140}}>
-                      <div style={{fontSize:12,color:muted,marginBottom:4}}>Imóveis</div>
-                      <div style={{height:6,background:border,borderRadius:3,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:`${Math.min(properties.length/2*100,100)}%`,background:properties.length>=2?"#ef4444":teal,borderRadius:3,transition:"width 0.3s"}}/>
-                      </div>
-                      <div style={{fontSize:12,marginTop:3,color:properties.length>=2?"#ef4444":muted}}>{properties.length}/2 imóveis</div>
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Plan comparison */}
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:16,marginBottom:20}}>
+              {/* Plan card — only Basic */}
+              <div style={{...CARD,borderRadius:16,border:`2px solid ${teal}`,position:"relative",maxWidth:400,margin:"0 auto 20px"}}>
+                <div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>ÚNICO PLANO</div>
+                <div style={{textAlign:"center",paddingBottom:16,borderBottom:`1px solid ${border}`,marginBottom:16}}>
+                  <div style={{fontSize:18,fontWeight:700,color:text,marginBottom:8}}>Basic</div>
+                  <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:2}}>
+                    <span style={{fontSize:32,fontWeight:800,color:teal}}>4,90€</span>
+                    <span style={{fontSize:13,color:muted}}>/mês</span>
+                  </div>
+                  <div style={{fontSize:12,color:muted,marginTop:4}}>3 dias gratuitos no registo</div>
+                </div>
                 {[
-                  {name:"Grátis",price:"0€",period:"",badge:"",color:"#94a3b8",features:[
-                    {t:"10 contactos",ok:true},{t:"2 imóveis",ok:true},{t:"Matches automáticos",ok:true},
-                    {t:"Landing pages públicas",ok:false},{t:"Campanhas",ok:false},{t:"Redes Sociais",ok:false},{t:"Suporte prioritário",ok:false}
-                  ]},
-                  {name:"Basic",price:"4,90€",period:"/mês",badge:"RECOMENDADO",color:teal,features:[
-                    {t:"Contactos ilimitados",ok:true},{t:"Imóveis ilimitados",ok:true},{t:"Matches automáticos",ok:true},
-                    {t:"Landing pages públicas",ok:true},{t:"Campanhas",ok:true},{t:"Redes Sociais",ok:true},{t:"Suporte prioritário",ok:true}
-                  ]}
-                ].map((plan,pi)=>(
-                  <div key={pi} style={{...CARD,borderRadius:16,border:`2px solid ${(isBasic&&pi===1)||(!isBasic&&pi===0)?plan.color:border}`,position:"relative"}}>
-                    {plan.badge&&<div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{plan.badge}</div>}
-                    <div style={{textAlign:"center",paddingBottom:16,borderBottom:`1px solid ${border}`,marginBottom:16}}>
-                      <div style={{fontSize:15,fontWeight:700,color:text,marginBottom:8}}>{plan.name}</div>
-                      <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:2}}>
-                        <span style={{fontSize:28,fontWeight:800,color:plan.color}}>{plan.price}</span>
-                        <span style={{fontSize:13,color:muted}}>{plan.period}</span>
-                      </div>
-                    </div>
-                    {plan.features.map((f,fi)=>(
-                      <div key={fi} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                        <span style={{fontSize:14,color:f.ok?"#10b981":"#cbd5e1",fontWeight:700,flexShrink:0}}>{f.ok?"✓":"✗"}</span>
-                        <span style={{fontSize:13,color:f.ok?text:muted}}>{f.t}</span>
-                      </div>
-                    ))}
-                    {!isBasic&&pi===1&&(
-                      <button
-                        onClick={()=>{
-                          const email=session?.user?.email||"";
-                          openStripeCheckout(session?.user?.id, session?.user?.email);
-                        }}
-                        style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"11px 16px",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:12,fontFamily:"inherit"}}
-                      >Fazer Upgrade</button>
-                    )}
-                    {isBasic&&pi===1&&(
-                      <div style={{background:`${teal}18`,borderRadius:8,padding:"9px 14px",marginTop:12,textAlign:"center",fontSize:13,color:teal,fontWeight:600}}>✓ Plano actual</div>
-                    )}
+                  {t:"Contactos ilimitados",ok:true},{t:"Imóveis ilimitados",ok:true},{t:"Matches automáticos",ok:true},
+                  {t:"Landing pages públicas",ok:true},{t:"Campanhas WhatsApp",ok:true},{t:"Redes Sociais",ok:true},{t:"Histórico de envios",ok:true},{t:"Suporte prioritário",ok:true}
+                ].map((f,fi)=>(
+                  <div key={fi} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:14,color:"#10b981",fontWeight:700,flexShrink:0}}>✓</span>
+                    <span style={{fontSize:13,color:text}}>{f.t}</span>
                   </div>
                 ))}
+                {!isBasic&&(
+                  <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email)}
+                    style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"12px 16px",fontWeight:700,fontSize:15,cursor:"pointer",marginTop:16,fontFamily:"inherit"}}>
+                    Subscrever por 4,90€/mês
+                  </button>
+                )}
+                {isBasic&&(
+                  <div style={{background:`${teal}18`,borderRadius:8,padding:"10px 14px",marginTop:16,textAlign:"center",fontSize:13,color:teal,fontWeight:600}}>✓ Plano actual</div>
+                )}
               </div>
 
               {/* FAQ */}
               <div style={CARD}>
                 <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:14}}>Perguntas Frequentes</h3>
                 {[
-                  ["Como é feito o pagamento?","Via cartão de crédito/débito, MB Way ou Multibanco através da plataforma Stripe. Cobrado mensalmente."],
-                  ["Posso cancelar a qualquer momento?","Sim. Cancelas no portal de cliente Stripe e o acesso mantém-se até ao fim do período pago."],
-                  ["O que acontece aos meus dados se cancelar?","Os teus dados ficam guardados. Passas a plano grátis com acesso limitado (10 contactos, 2 imóveis)."],
-                  ["Como activar o Basic após pagamento?","O plano é activado automaticamente. Se não activar em 5 minutos, contacta o suporte."],
+                  ["Como funciona o trial?",`Ao registares-te tens ${TRIAL_DAYS} dias gratuitos com acesso completo. Depois precisas subscrever.`],
+                  ["Como é feito o pagamento?","Via cartão de crédito/débito, MB Way ou Multibanco através da Stripe. Cobrado mensalmente."],
+                  ["Posso cancelar a qualquer momento?","Sim. Cancelas no portal Stripe e o acesso mantém-se até ao fim do período pago."],
+                  ["Como activar o Basic após pagamento?","O plano é activado automaticamente após o pagamento. Se não activar em 5 minutos, contacta o suporte."],
                 ].map(([q,a],i)=>(
                   <div key={i} style={{marginBottom:12,paddingBottom:12,borderBottom:i<3?`1px solid ${border}`:"none"}}>
                     <div style={{fontSize:13,fontWeight:700,color:text,marginBottom:4}}>{q}</div>
                     <div style={{fontSize:13,color:muted,lineHeight:1.6}}>{a}</div>
+
                   </div>
                 ))}
               </div>
@@ -1979,7 +2027,7 @@ function ImoPro() {
 
             {/* REDES SOCIAIS */}
             {page==="social"&&<div>
-              {!isBasic&&<div style={{background:`${teal}11`,border:`1px solid ${teal}33`,borderRadius:14,padding:16,marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              {!hasAccess&&<div style={{background:`${teal}11`,border:`1px solid ${teal}33`,borderRadius:14,padding:16,marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                 <span className="material-icons-outlined" style={{color:teal,fontSize:22}}>lock</span>
                 <div style={{flex:1,minWidth:200}}>
                   <div style={{fontSize:13,fontWeight:700,color:text}}>Funcionalidade do Plano Basic</div>
@@ -1987,7 +2035,7 @@ function ImoPro() {
                 </div>
                 <button onClick={()=>setShowUpgrade({reason:"feature",label:"Redes Sociais"})} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Ver Planos</button>
               </div>}
-              <div style={{opacity:isBasic?1:0.35,pointerEvents:isBasic?"auto":"none"}}>
+              <div style={{opacity:hasAccess?1:0.35,pointerEvents:hasAccess?"auto":"none"}}>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:isMobile?12:16,marginBottom:20}}>
                 {[{name:"Facebook",color:"#1877f2",icon:"f",connected:false,desc:"Publicação automática na sua página"},{name:"Instagram",color:"#e1306c",icon:"◈",connected:false,desc:"Posts e Stories automáticos"},{name:"WhatsApp Business",color:"#25d366",icon:"◉",connected:true,desc:"Envio directo para contactos"},{name:"Portal Imobiliário",color:teal,icon:"⬡",connected:false,desc:"Idealista · Imovirtual"}].map((sn,i)=>(
                   <div key={i} style={{...CARD,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
@@ -2019,14 +2067,13 @@ function ImoPro() {
         <div style={{position:"fixed",inset:0,zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.6)"}}>
           <div style={{background:card,borderRadius:20,padding:32,maxWidth:400,width:"92%",border:`1px solid ${border}`,textAlign:"center"}}>
             <div style={{fontSize:40,marginBottom:8}}>🚀</div>
-            <div style={{fontSize:20,fontWeight:800,color:text,marginBottom:8}}>Limite do Plano Grátis</div>
+            <div style={{fontSize:20,fontWeight:800,color:text,marginBottom:8}}>{isTrialActive?"Trial a terminar":"Subscrição necessária"}</div>
             <div style={{fontSize:14,color:muted,marginBottom:20,lineHeight:1.6}}>
-              {showUpgrade.reason==="contacts"
-                ?`Atingiste o limite de ${showUpgrade.limit} contactos no plano grátis.`
-                :showUpgrade.reason==="properties"
-                ?`Atingiste o limite de ${showUpgrade.limit} imóveis no plano grátis.`
-                :`Esta funcionalidade requer o plano Basic.`}
-              <br/>Faz upgrade para o plano <strong style={{color:teal}}>Basic</strong> por apenas <strong style={{color:teal}}>4,90€/mês</strong>.
+              {isTrialActive
+                ?`O teu trial termina em ${trialDaysLeft} dia${trialDaysLeft!==1?"s":""}.`
+                :"O teu trial expirou."}<br/>
+              {showUpgrade.reason==="feature"?"Esta funcionalidade requer o plano Basic.":""}<br/>
+              Subscreve o plano <strong style={{color:teal}}>Basic</strong> por apenas <strong style={{color:teal}}>4,90€/mês</strong>.
             </div>
             <div style={{background:`${teal}11`,borderRadius:12,padding:16,marginBottom:20,textAlign:"left"}}>
               <div style={{fontSize:13,fontWeight:700,color:teal,marginBottom:8}}>✦ Plano Basic inclui:</div>
@@ -2045,7 +2092,7 @@ function ImoPro() {
             >
               Fazer Upgrade — 4,90€/mês
             </button>
-            <button onClick={()=>setShowUpgrade(null)} style={{background:"none",border:"none",color:muted,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>Continuar no plano grátis</button>
+            <button onClick={()=>setShowUpgrade(null)} style={{background:"none",border:"none",color:muted,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>Fechar</button>
           </div>
         </div>
       )}
@@ -2066,7 +2113,7 @@ function ImoPro() {
       {showProfileModal&&<ProfileModal profile={profile} session={session} onClose={()=>setShowProfileModal(false)} onSaved={p=>{setProfile(p);}} theme={theme} isMobile={isMobile}/>}
       {editContact&&<ContactForm contact={editContact} setContact={setEditContact} onSave={saveContact} onDelete={deleteContact} onClose={()=>setEditContact(null)} isNew={isNewContact} isMobile={isMobile} theme={theme}/>}
       {editProperty&&<PropertyForm property={editProperty} setProperty={setEditProperty} onSave={saveProperty} onDelete={deleteProperty} onClose={()=>setEditProperty(null)} isNew={isNewProperty} isMobile={isMobile} theme={theme} onPhotos={handlePhotos}/>}
-      {sendProp&&<SendModal property={sendProp} contacts={contacts} onClose={()=>setSendProp(null)} isMobile={isMobile} theme={theme}/>}
+      {sendProp&&<SendModal property={sendProp} contacts={contacts} session={session} onClose={()=>setSendProp(null)} isMobile={isMobile} theme={theme}/>}
 
       {/* IMPORT MODAL */}
       {showImport&&(
