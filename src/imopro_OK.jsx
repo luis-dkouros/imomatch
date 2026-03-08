@@ -794,13 +794,9 @@ function LoginScreen({dark}) {
         if(error) setError(error.message==="Invalid login credentials"?"Email ou palavra-passe incorrectos.":error.message);
       } else {
         if(!name.trim()) { setError("Indica o teu nome."); setLoading(false); return; }
-        const prodUrl = process.env.REACT_APP_SITE_URL || window.location.origin;
         const { error } = await supabase.auth.signUp({
           email: email.trim(), password: pass,
-          options: {
-            data: { name: name.trim() },
-            emailRedirectTo: prodUrl
-          }
+          options: { data: { name: name.trim() } }
         });
         if(error) setError(error.message);
         else setError("✅ Conta criada! Verifica o teu email para confirmar.");
@@ -864,13 +860,6 @@ function LoginScreen({dark}) {
 const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"}];
 const PLAN_LIMITS={free:{contacts:10,properties:2},basic:{contacts:Infinity,properties:Infinity}};
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
-const STRIPE_PORTAL=process.env.REACT_APP_STRIPE_PORTAL||"https://billing.stripe.com/p/login/YOUR_PORTAL_LINK";
-function openStripeCheckout(userId, email) {
-  const url = new URL(STRIPE_LINK);
-  if(userId) url.searchParams.set("client_reference_id", userId);
-  if(email)  url.searchParams.set("prefilled_email", email);
-  window.open(url.toString(), "_blank");
-}
 
 // ─── PROPERTY LANDING PAGE ────────────────────────────────────────────────────
 function PropertyPage() {
@@ -1342,29 +1331,6 @@ function ImoPro() {
     loadProfile();
     loadContacts();
     loadProperties();
-  },[session]);
-
-  // ── Handle Stripe return (?payment=success) ──
-  useEffect(()=>{
-    const params = new URLSearchParams(window.location.search);
-    if(params.get("payment")==="success"){
-      // Clean URL
-      window.history.replaceState({},"",window.location.pathname);
-      // Poll until Supabase webhook updates the plan (max 10s)
-      let tries=0;
-      const poll = setInterval(async()=>{
-        tries++;
-        const {data} = await supabase.from("profiles").select("plan").eq("id",session?.user?.id).single();
-        if(data?.plan==="basic" || tries>=10){
-          clearInterval(poll);
-          if(data?.plan==="basic"){
-            setProfile(p=>({...p,plan:"basic"}));
-            setPage("billing");
-            showNotif("🎉 Plano Basic activado com sucesso!");
-          }
-        }
-      },1000);
-    }
   },[session]);
 
   const loadProfile = async()=>{
@@ -1884,14 +1850,14 @@ function ImoPro() {
                   </div>
                   {isBasic?(
                     <button
-                      onClick={()=>window.open(STRIPE_PORTAL,"_blank")}
+                      onClick={()=>window.open("https://billing.stripe.com","_blank")}
                       style={{background:inp,color:muted,border:`1px solid ${border}`,borderRadius:8,padding:"9px 16px",fontWeight:600,cursor:"pointer",fontSize:13,fontFamily:"inherit",whiteSpace:"nowrap"}}
                     >Gerir Subscrição</button>
                   ):(
                     <button
                       onClick={()=>{
                         const email=session?.user?.email||"";
-                        openStripeCheckout(session?.user?.id, session?.user?.email);
+                        window.open(`${STRIPE_LINK}?prefilled_email=${encodeURIComponent(email)}`,"_blank");
                       }}
                       style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"10px 20px",fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit",whiteSpace:"nowrap"}}
                     >⬆ Fazer Upgrade</button>
@@ -1948,7 +1914,7 @@ function ImoPro() {
                       <button
                         onClick={()=>{
                           const email=session?.user?.email||"";
-                          openStripeCheckout(session?.user?.id, session?.user?.email);
+                          window.open(`${STRIPE_LINK}?prefilled_email=${encodeURIComponent(email)}`,"_blank");
                         }}
                         style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"11px 16px",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:12,fontFamily:"inherit"}}
                       >Fazer Upgrade</button>
@@ -2039,7 +2005,7 @@ function ImoPro() {
             <button
               onClick={()=>{
                 const email=session?.user?.email||"";
-                openStripeCheckout(session?.user?.id, session?.user?.email);
+                window.open(`${STRIPE_LINK}?prefilled_email=${encodeURIComponent(email)}`,"_blank");
               }}
               style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"13px 20px",fontWeight:700,fontSize:15,cursor:"pointer",marginBottom:10,fontFamily:"inherit"}}
             >
