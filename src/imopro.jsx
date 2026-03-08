@@ -1306,6 +1306,8 @@ function ImoPro() {
   const [importPrev,setImportPrev]= useState([]);
   const [importErr, setImportErr] = useState("");
   const [showUpgrade, setShowUpgrade]  = useState(null); // {reason:'contacts'|'properties'|'feature', label:''}
+  const [isMobile,  setIsMobile]  = useState(window.innerWidth<768);
+  const [isTablet,  setIsTablet]  = useState(window.innerWidth<1024);
 
   // ── Responsive listener ──
   useEffect(()=>{
