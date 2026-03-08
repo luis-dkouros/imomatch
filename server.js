@@ -182,54 +182,90 @@ function buildOGHtml(property) {
 }
 
 // ── Proxy de imagem OG ─────────────────────────────────────────────────────
-// Necessário porque o Supabase Storage pode bloquear crawlers externos.
-// O WhatsApp crawler vai buscar esta URL directamente.
+// CRÍTICO: O WhatsApp NÃO segue redirects na imagem OG.
+// Este proxy faz fetch da imagem no servidor (seguindo redirects internamente)
+// e envia os bytes directamente ao crawler — nunca expõe o URL do Supabase.
+
+function fetchImageAsStream(targetUrl, res, redirectsLeft = 5) {
+  if (redirectsLeft === 0) {
+    res.redirect(302, `${SITE_URL}/og-default.png`);
+    return;
+  }
+
+  let urlObj;
+  try { urlObj = new URL(targetUrl); }
+  catch (e) {
+    res.redirect(302, `${SITE_URL}/og-default.png`);
+    return;
+  }
+
+  const proto = urlObj.protocol === "https:" ? https : http;
+  const options = {
+    hostname: urlObj.hostname,
+    port:     urlObj.port || (urlObj.protocol === "https:" ? 443 : 80),
+    path:     urlObj.pathname + urlObj.search,
+    method:   "GET",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; ImoPro-OG/1.0)",
+      "Accept":     "image/webp,image/jpeg,image/png,image/*",
+    },
+  };
+
+  const req = proto.request(options, imgRes => {
+    // Seguir redirect no servidor — NÃO enviar redirect ao crawler
+    if (imgRes.statusCode >= 300 && imgRes.statusCode < 400 && imgRes.headers.location) {
+      imgRes.resume(); // consumir body para libertar socket
+      const next = imgRes.headers.location.startsWith("http")
+        ? imgRes.headers.location
+        : `${urlObj.protocol}//${urlObj.host}${imgRes.headers.location}`;
+      return fetchImageAsStream(next, res, redirectsLeft - 1);
+    }
+
+    if (imgRes.statusCode !== 200) {
+      imgRes.resume();
+      res.redirect(302, `${SITE_URL}/og-default.png`);
+      return;
+    }
+
+    const ct = imgRes.headers["content-type"] || "image/jpeg";
+    res.setHeader("Content-Type",  ct);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    if (imgRes.headers["content-length"]) {
+      res.setHeader("Content-Length", imgRes.headers["content-length"]);
+    }
+
+    imgRes.pipe(res);
+    imgRes.on("error", () => res.end());
+  });
+
+  req.on("error", () => {
+    if (!res.headersSent) res.redirect(302, `${SITE_URL}/og-default.png`);
+  });
+
+  req.setTimeout(10000, () => {
+    req.destroy();
+    if (!res.headersSent) res.redirect(302, `${SITE_URL}/og-default.png`);
+  });
+
+  req.end();
+}
+
 app.get("/og-image/:id", async (req, res) => {
   try {
     const property = await fetchProperty(req.params.id);
     const rawUrl   = property?.photos?.[0]?.url;
 
     if (!rawUrl) {
-      // Sem foto → redirecionar para imagem padrão
-      return res.redirect(301, `${SITE_URL}/og-default.png`);
+      return res.redirect(302, `${SITE_URL}/og-default.png`);
     }
 
-    const urlObj = new URL(rawUrl);
-    const proto  = urlObj.protocol === "https:" ? https : http;
-
-    const options = {
-      hostname: urlObj.hostname,
-      path:     urlObj.pathname + urlObj.search,
-      headers: {
-        "User-Agent": "ImoPro-OG-Proxy/1.0",
-        "Accept":     "image/*",
-      },
-    };
-
-    const imgReq = proto.get(options, imgRes => {
-      // Seguir redirects (Supabase Storage pode redirecionar)
-      if (imgRes.statusCode >= 300 && imgRes.statusCode < 400 && imgRes.headers.location) {
-        return res.redirect(imgRes.headers.location);
-      }
-
-      if (imgRes.statusCode !== 200) {
-        return res.redirect(301, `${SITE_URL}/og-default.png`);
-      }
-
-      res.setHeader("Content-Type",  imgRes.headers["content-type"] || "image/jpeg");
-      res.setHeader("Cache-Control", "public, max-age=86400"); // cache 24h nos crawlers
-      imgRes.pipe(res);
-    });
-
-    imgReq.on("error", () => res.redirect(301, `${SITE_URL}/og-default.png`));
-    imgReq.setTimeout(8000, () => {
-      imgReq.destroy();
-      res.redirect(301, `${SITE_URL}/og-default.png`);
-    });
+    fetchImageAsStream(rawUrl, res);
 
   } catch (err) {
     console.error("[OG-IMAGE] Erro:", err.message);
-    res.redirect(301, `${SITE_URL}/og-default.png`);
+    if (!res.headersSent) res.redirect(302, `${SITE_URL}/og-default.png`);
   }
 });
 
