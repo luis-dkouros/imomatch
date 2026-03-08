@@ -899,10 +899,7 @@ function LoginScreen({dark}) {
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
       <div style={{width:"100%",maxWidth:400}}>
         <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{width:56,height:56,background:teal,borderRadius:14,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:12}}>
-            <span className="material-icons-outlined" style={{color:"#fff",fontSize:28}}>home_work</span>
-          </div>
-          <h1 style={{fontSize:26,fontWeight:700,color:text,margin:0}}>ImoMatch</h1>
+          <img src={LOGO_URL} alt="ImoMatch" style={{height:72,objectFit:"contain",marginBottom:12}}/>
           <p style={{fontSize:14,color:muted,marginTop:4}}>Gestão Imobiliária Profissional</p>
         </div>
         <div style={{background:card,border:`1px solid ${border}`,borderRadius:16,padding:28}}>
