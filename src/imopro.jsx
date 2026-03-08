@@ -8,6 +8,12 @@ const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Cliente público sem sessão – usado em rotas públicas como /imovel/:id
+// Garante que o RLS do Supabase não bloqueie utilizadores não autenticados
+const supabasePublic = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
 const INTERESTS = ["Apartamento","Moradia","Terreno","Comercial","Investimento"];
 const TYPOLOGIES = ["T0","T1","T2","T3","T4+"];
 const PRICE_RANGES = ["Até 100k€","100k–200k€","200k–350k€","350k–500k€","500k€+"];
@@ -963,11 +969,11 @@ function PropertyPage() {
   const navy = "#112D4E";
 
   useEffect(()=>{
-    supabase.from("properties").select("*").eq("id", id).single()
+    supabasePublic.from("properties").select("*").eq("id", id).single()
       .then(({data, error})=>{
         if(!error && data){
           setProperty(data);
-          supabase.from("profiles").select("*").eq("id", data.user_id).single()
+          supabasePublic.from("profiles").select("*").eq("id", data.user_id).single()
             .then(({data:ag})=>{ if(ag) setAgent(ag); });
         }
         setLoading(false);
