@@ -803,17 +803,41 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
   const {teal,text,muted,inp,inpB,border,card,BTNP,BTNS:mkBTNS,INP:mkINP} = theme;
   const INP = mkINP(inp,inpB,text);
   const BTNS = mkBTNS(inp,border,muted);
-  const [name,  setName]  = useState(profile?.name||"");
-  const [phone, setPhone] = useState(profile?.phone||"");
-  const [bio,   setBio]   = useState(profile?.bio||"");
-  const [agency,setAgency]= useState(profile?.agency||"");
-  const [loading,setLoading] = useState(false);
-  const [error,  setError]   = useState("");
+  const [name,     setName]     = useState(profile?.name||"");
+  const [phone,    setPhone]    = useState(profile?.phone||"");
+  const [bio,      setBio]      = useState(profile?.bio||"");
+  const [agency,   setAgency]   = useState(profile?.agency||"");
+  const [website,  setWebsite]  = useState(profile?.website||"");
+  const [photoUrl, setPhotoUrl] = useState(profile?.photo_url||"");
+  const [uploading,setUploading]= useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
+
+  const handlePhoto = async (e) => {
+    const file = e.target.files[0]; if(!file) return;
+    setUploading(true); setError("");
+    const ext  = file.name.split(".").pop();
+    const path = `${session.user.id}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("property-photos").upload(path, file, {contentType: file.type, upsert: true});
+    if(upErr){ setError("Erro ao carregar foto: "+upErr.message); setUploading(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from("property-photos").getPublicUrl(path);
+    setPhotoUrl(publicUrl);
+    setUploading(false);
+  };
 
   const save = async () => {
     if(!name.trim()){ setError("O nome é obrigatório."); return; }
     setLoading(true); setError("");
-    const updates = { id: session.user.id, name: name.trim(), phone: phone.trim(), bio: bio.trim(), agency: agency.trim(), updated_at: new Date().toISOString() };
+    const updates = {
+      id: session.user.id,
+      name: name.trim(),
+      phone: phone.trim(),
+      bio: bio.trim(),
+      agency: agency.trim(),
+      website: website.trim(),
+      photo_url: photoUrl,
+      updated_at: new Date().toISOString()
+    };
     const { data, error: err } = await supabase.from("profiles").upsert(updates).select().single();
     setLoading(false);
     if(err) { setError("Erro ao guardar: "+err.message); return; }
@@ -825,12 +849,35 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
     <AppModal onClose={onClose} title="Editar Perfil" isMobile={isMobile} card={card} border={border} text={text} muted={muted}>
       <div style={{display:"flex",flexDirection:"column",gap:14}}>
         {error&&<div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:8,padding:"10px 14px",color:"#ef4444",fontSize:13}}>{error}</div>}
+
+        {/* Foto */}
+        <div style={{display:"flex",alignItems:"center",gap:16}}>
+          <div style={{position:"relative",flexShrink:0}}>
+            {photoUrl
+              ?<img src={photoUrl} alt="" style={{width:72,height:72,borderRadius:"50%",objectFit:"cover",border:`3px solid ${teal}`}}/>
+              :<div style={{width:72,height:72,borderRadius:"50%",background:`${teal}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,border:`3px solid ${teal}`}}>👤</div>}
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:6}}>Foto de Perfil</div>
+            <label style={{display:"inline-flex",alignItems:"center",gap:6,background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"7px 12px",cursor:"pointer",fontSize:13,color:text,fontWeight:600}}>
+              <span className="material-icons-outlined" style={{fontSize:16}}>{uploading?"autorenew":"upload"}</span>
+              {uploading?"A carregar...":"Carregar foto"}
+              <input type="file" accept="image/*" onChange={handlePhoto} style={{display:"none"}} disabled={uploading}/>
+            </label>
+          </div>
+        </div>
+
         <div>
           <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Nome *</div>
           <input value={name} onChange={e=>setName(e.target.value)} placeholder="O teu nome" style={{...INP,width:"100%"}}/>
         </div>
+
+        <div style={{fontSize:12,color:muted,background:inp,borderRadius:8,padding:"9px 12px",border:`1px solid ${inpB}`}}>
+          <span style={{fontWeight:700}}>Email:</span> {session?.user?.email}
+        </div>
+
         <div>
-          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Telefone (WhatsApp)</div>
+          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Telefone / WhatsApp</div>
           <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+351 9XX XXX XXX" style={{...INP,width:"100%"}}/>
         </div>
         <div>
@@ -838,12 +885,16 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
           <input value={agency} onChange={e=>setAgency(e.target.value)} placeholder="Nome da agência" style={{...INP,width:"100%"}}/>
         </div>
         <div>
-          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Bio / Apresentação</div>
-          <textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder="Breve descrição sobre ti..." style={{...INP,resize:"vertical",width:"100%"}} rows={3}/>
+          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Website</div>
+          <input value={website} onChange={e=>setWebsite(e.target.value)} placeholder="https://www.exemplo.pt" style={{...INP,width:"100%"}}/>
         </div>
-        <div style={{fontSize:12,color:muted}}>Email: {session?.user?.email}</div>
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Apresentação <span style={{fontWeight:400,textTransform:"none"}}>(aparece na landing page)</span></div>
+          <textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder="Ex: Consultor imobiliário com 10 anos de experiência no Grande Porto..." style={{...INP,resize:"vertical",width:"100%"}} rows={4}/>
+        </div>
+
         <div style={{display:"flex",gap:10,marginTop:4}}>
-          <button onClick={save} disabled={loading} style={{...BTNP,flex:1,justifyContent:"center",opacity:loading?0.7:1}}>
+          <button onClick={save} disabled={loading||uploading} style={{...BTNP,flex:1,justifyContent:"center",opacity:(loading||uploading)?0.7:1}}>
             {loading?"A guardar...":"Guardar Perfil"}
           </button>
           <button onClick={onClose} style={{...BTNS,flex:1,justifyContent:"center"}}>Cancelar</button>
@@ -1124,28 +1175,37 @@ function PropertyPage() {
         <div id="agent" style={{background:"#ffffff",borderRadius:20,padding:28,marginBottom:32,border:"1px solid #e2e8f0"}}>
           <div style={{display:"flex",alignItems:"flex-start",gap:20,flexWrap:"wrap"}}>
             {agent?.photo_url
-              ?<img src={agent.photo_url} alt="" style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:"3px solid "+teal,flexShrink:0}}/>
-              :<div style={{width:80,height:80,borderRadius:"50%",background:`${teal}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,flexShrink:0,border:"3px solid "+teal}}>👤</div>}
+              ?<img src={agent.photo_url} alt="" style={{width:88,height:88,borderRadius:"50%",objectFit:"cover",border:"3px solid "+teal,flexShrink:0}}/>
+              :<div style={{width:88,height:88,borderRadius:"50%",background:`${teal}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,flexShrink:0,border:"3px solid "+teal}}>👤</div>}
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:20,fontWeight:800,marginBottom:4,color:"#112D4E"}}>{agent?.name||"Agente Imobiliário"}</div>
-              <div style={{fontSize:13,color:teal,fontWeight:600,marginBottom:10}}>Consultor Imobiliário</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+              <div style={{fontSize:20,fontWeight:800,marginBottom:2,color:"#112D4E"}}>{agent?.name||"Agente Imobiliário"}</div>
+              {agent?.agency&&<div style={{fontSize:13,color:teal,fontWeight:600,marginBottom:6}}>{agent.agency}</div>}
+              {!agent?.agency&&<div style={{fontSize:13,color:teal,fontWeight:600,marginBottom:6}}>Consultor Imobiliário</div>}
+              {agent?.bio&&<p style={{fontSize:13,color:"#475569",lineHeight:1.6,margin:"0 0 12px 0"}}>{agent.bio}</p>}
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
                 {agent?.phone&&(
                   <a href={waLink} target="_blank" rel="noreferrer"
-                    style={{display:"inline-flex",alignItems:"center",gap:6,background:"#25d366",color:"#fff",padding:"10px 18px",borderRadius:10,fontWeight:700,fontSize:13}}>
+                    style={{display:"inline-flex",alignItems:"center",gap:6,background:"#25d366",color:"#fff",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,textDecoration:"none"}}>
                     <span className="material-icons-outlined" style={{fontSize:16}}>chat</span>WhatsApp
                   </a>
                 )}
                 {agent?.email&&(
                   <a href={`mailto:${agent.email}?subject=Interesse: ${property.title}`}
-                    style={{display:"inline-flex",alignItems:"center",gap:6,background:"#f1f5f9",color:"#112D4E",padding:"10px 18px",borderRadius:10,fontWeight:700,fontSize:13,border:"1px solid #e2e8f0"}}>
+                    style={{display:"inline-flex",alignItems:"center",gap:6,background:"#f1f5f9",color:"#112D4E",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,border:"1px solid #e2e8f0",textDecoration:"none"}}>
                     <span className="material-icons-outlined" style={{fontSize:16}}>email</span>{agent.email}
                   </a>
                 )}
                 {agent?.phone&&(
-                  <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"#f1f5f9",color:"#64748b",padding:"10px 18px",borderRadius:10,fontSize:13,border:"1px solid #e2e8f0"}}>
+                  <a href={`tel:${agent.phone}`}
+                    style={{display:"inline-flex",alignItems:"center",gap:6,background:"#f1f5f9",color:"#112D4E",padding:"9px 16px",borderRadius:10,fontSize:13,border:"1px solid #e2e8f0",textDecoration:"none"}}>
                     <span className="material-icons-outlined" style={{fontSize:16}}>phone</span>{agent.phone}
-                  </div>
+                  </a>
+                )}
+                {agent?.website&&(
+                  <a href={agent.website.startsWith("http")?agent.website:`https://${agent.website}`} target="_blank" rel="noreferrer"
+                    style={{display:"inline-flex",alignItems:"center",gap:6,background:"#f1f5f9",color:"#112D4E",padding:"9px 16px",borderRadius:10,fontSize:13,border:"1px solid #e2e8f0",textDecoration:"none"}}>
+                    <span className="material-icons-outlined" style={{fontSize:16}}>language</span>Website
+                  </a>
                 )}
               </div>
             </div>
