@@ -1001,10 +1001,14 @@ function LoginScreen({dark}) {
       if(signUpErr) { setError(signUpErr.message); setLoading(false); return; }
 
       const userId = data?.user?.id;
-      if(!userId) { setError("Erro ao criar conta. Tenta novamente."); setLoading(false); return; }
+      if(!userId) {
+        // Supabase devolveu user null — confirmação de email pode estar activa
+        setError("Erro ao criar conta. Verifica se o email já existe ou se a confirmação de email está desactivada no Supabase (Authentication → Providers → Email → Confirm email OFF).");
+        setLoading(false); return;
+      }
 
       // 2. Guardar perfil
-      await supabase.from("profiles").upsert({
+      const { error: profileErr } = await supabase.from("profiles").upsert({
         id:        userId,
         name:      name.trim(),
         phone:     phone.trim(),
@@ -1014,9 +1018,11 @@ function LoginScreen({dark}) {
         plan:      "pending",
         updated_at: new Date().toISOString()
       });
+      if(profileErr) { setError("Conta criada mas erro no perfil: " + profileErr.message); setLoading(false); return; }
 
       // 3. Ir para Stripe Checkout
       const stripeLink = process.env.REACT_APP_STRIPE_LINK || "#";
+      if(stripeLink === "#") { setError("Link do Stripe não configurado (REACT_APP_STRIPE_LINK)."); setLoading(false); return; }
       const url = new URL(stripeLink);
       url.searchParams.set("client_reference_id", userId);
       url.searchParams.set("prefilled_email", email.trim());
