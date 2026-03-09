@@ -524,7 +524,26 @@ function ContactForm({contact, setContact, onSave, onClose, onDelete, isNew, isM
     <AppModal onClose={onClose} title={isNew?"Novo Contacto":"Editar Contacto"} wide isMobile={isMobile} card={card} border={border} text={text} muted={muted}>
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
         <FL label="Nome *" muted={muted}><input style={INP} value={contact.name} onChange={e=>set({name:e.target.value})} placeholder="Nome completo"/></FL>
-        <FL label="Telefone *" muted={muted}><input style={INP} value={contact.phone} onChange={e=>set({phone:e.target.value})} placeholder="+351 9XX XXX XXX"/></FL>
+        <FL label="Telefone *" muted={muted}>
+          <div style={{display:"flex",gap:6}}>
+            <select style={{...INP,width:110,flexShrink:0,padding:"0 6px"}}
+              value={contact.phone_code||"+351"}
+              onChange={e=>set({phone_code:e.target.value})}>
+              {[
+                {c:"🇵🇹",l:"PT",v:"+351"},{c:"🇧🇷",l:"BR",v:"+55"},{c:"🇬🇧",l:"GB",v:"+44"},
+                {c:"🇺🇸",l:"US",v:"+1"},{c:"🇫🇷",l:"FR",v:"+33"},{c:"🇩🇪",l:"DE",v:"+49"},
+                {c:"🇪🇸",l:"ES",v:"+34"},{c:"🇮🇹",l:"IT",v:"+39"},{c:"🇳🇱",l:"NL",v:"+31"},
+                {c:"🇨🇭",l:"CH",v:"+41"},{c:"🇧🇪",l:"BE",v:"+32"},{c:"🇨🇳",l:"CN",v:"+86"},
+                {c:"🇦🇴",l:"AO",v:"+244"},{c:"🇲🇿",l:"MZ",v:"+258"},{c:"🇨🇻",l:"CV",v:"+238"},
+                {c:"🇱🇺",l:"LU",v:"+352"},{c:"🇸🇪",l:"SE",v:"+46"},{c:"🇳🇴",l:"NO",v:"+47"},
+                {c:"🇩🇰",l:"DK",v:"+45"},{c:"🇵🇱",l:"PL",v:"+48"},{c:"🇷🇺",l:"RU",v:"+7"},
+                {c:"🇦🇪",l:"AE",v:"+971"},{c:"🇶🇦",l:"QA",v:"+974"},{c:"🇸🇦",l:"SA",v:"+966"},
+                {c:"🇦🇺",l:"AU",v:"+61"},{c:"🇨🇦",l:"CA",v:"+1"},{c:"🇲🇦",l:"MA",v:"+212"},
+              ].map(({c,l,v})=><option key={l+v} value={v}>{c} {l} {v}</option>)}
+            </select>
+            <input style={{...INP,flex:1}} value={contact.phone} onChange={e=>set({phone:e.target.value})} placeholder="9XX XXX XXX"/>
+          </div>
+        </FL>
       </div>
       <FL label="Email" muted={muted}><input style={INP} value={contact.email} onChange={e=>set({email:e.target.value})} placeholder="email@exemplo.pt"/></FL>
       <div style={{background:inp,border:`1px solid ${border}`,borderRadius:10,padding:16,marginBottom:14}}>
@@ -692,7 +711,9 @@ function SendModal({property, contacts, session, onClose, isMobile, theme}) {
   },[property, session]);
 
   const sendOne = async c => {
-    const phone=c.phone.replace(/\D/g,"");
+    const code = (c.phone_code||"+351").replace(/\D/g,"");
+    const num  = c.phone.replace(/\D/g,"");
+    const phone = code + num;
     const m=encodeURIComponent(msg.replace(/\{nome\}/g,c.name.split(" ")[0]));
     window.open(`https://wa.me/${phone}?text=${m}`,"_blank");
     setSentIds(p=>[...p,c.id]);
@@ -736,7 +757,7 @@ function SendModal({property, contacts, session, onClose, isMobile, theme}) {
                 <div style={{width:34,height:34,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(c.name)}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:14,fontWeight:600,color:text}}>{c.name}</div>
-                  <div style={{fontSize:12,color:muted}}>{c.phone}</div>
+                  <div style={{fontSize:12,color:muted}}>{(c.phone_code&&c.phone_code!=="+351"?c.phone_code+" ":"")+c.phone}</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                   <span style={{fontSize:12,fontWeight:700,color:scC}}>{sc}%</span>
@@ -1645,7 +1666,7 @@ function mkStyles(dark, isMobile) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
-const EMPTY_C = {name:"",phone:"",email:"",interests:[],typologies:[],districts:[],concelhos:[],freguesias:[],price_range:"",priceRange:"",status:"Frio",notes:""};
+const EMPTY_C = {name:"",phone:"",phone_code:"+351",email:"",interests:[],typologies:[],districts:[],concelhos:[],freguesias:[],price_range:"",priceRange:"",status:"Frio",notes:""};
 const EMPTY_P = {title:"",type:"",typology:"",district:"",concelho:"",freguesia:"",price:"",area:"",description:"",photos:[]};
 
 function ImoPro() {
@@ -1797,7 +1818,7 @@ function ImoPro() {
     }
     setLoading(true);
     const payload = {
-      name:editContact.name, phone:editContact.phone, email:editContact.email||"",
+      name:editContact.name, phone:editContact.phone, phone_code:editContact.phone_code||"+351", email:editContact.email||"",
       interests:editContact.interests||[], typologies:editContact.typologies||[],
       districts:editContact.districts||[], concelhos:editContact.concelhos||[],
       freguesias:editContact.freguesias||[], price_range:editContact.priceRange||editContact.price_range||"",
@@ -2202,7 +2223,7 @@ function ImoPro() {
                       <div style={{flex:1,cursor:"pointer"}} onClick={()=>{setEditContact({...c,priceRange:c.price_range||c.priceRange||""});setIsNewContact(false);}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <div style={{width:36,height:36,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(c.name)}</div>
-                          <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,color:text}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{c.phone}</div></div>
+                          <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,color:text}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{(c.phone_code&&c.phone_code!=="+351"?c.phone_code+" ":"")+c.phone}</div></div>
                           <Badge status={c.status}/>
                         </div>
                         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:6}}>{(c.interests||[]).map(t=><span key={t} style={{padding:"2px 8px",borderRadius:20,fontSize:11,background:`${teal}18`,color:teal,fontWeight:600}}>{t}</span>)}</div>
@@ -2222,7 +2243,7 @@ function ImoPro() {
                           <td style={{...TD,width:32,paddingRight:0}}><div onClick={e=>{e.stopPropagation();setSelectedContacts(prev=>prev.includes(c.id)?prev.filter(x=>x!==c.id):[...prev,c.id]);}} style={{cursor:"pointer",color:selectedContacts.includes(c.id)?teal:muted}}><span className="material-icons-outlined" style={{fontSize:18}}>{selectedContacts.includes(c.id)?"check_box":"check_box_outline_blank"}</span></div></td>
                           <td style={TD}><div style={{display:"flex",alignItems:"center",gap:10}}>
                             <div style={{width:34,height:34,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(c.name)}</div>
-                            <div><div style={{fontWeight:600}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{c.phone}</div></div>
+                            <div><div style={{fontWeight:600}}>{c.name}</div><div style={{fontSize:12,color:muted}}>{(c.phone_code&&c.phone_code!=="+351"?c.phone_code+" ":"")+c.phone}</div></div>
                           </div></td>
                           <td style={TD}><div style={{fontWeight:500}}>{(c.concelhos||[]).join(", ")||"—"}</div><div style={{fontSize:11,color:muted}}>{(c.districts||[]).join(", ")||""}</div></td>
                           <td style={TD}><span style={{fontWeight:600}}>{c.price_range||c.priceRange||"—"}</span></td>
@@ -2272,7 +2293,7 @@ function ImoPro() {
                         <thead><tr><th style={TH}>Contacto</th><th style={TH}>Preferências</th><th style={TH}>Budget</th><th style={{...TH,textAlign:"center"}}>Score</th><th style={{...TH,textAlign:"right"}}>Acção</th></tr></thead>
                         <tbody>{ms.map(c=>{const sc=getScore(c,p),scC=sc>=80?"#10b981":sc>=60?"#f59e0b":"#ef4444";return(
                           <tr key={c.id}>
-                            <td style={TD}><div style={{display:"flex",alignItems:"center",gap:9}}><div style={{width:30,height:30,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>{initials(c.name)}</div><div><div style={{fontWeight:600,fontSize:13}}>{c.name}</div><div style={{fontSize:11,color:muted}}>{c.phone}</div></div></div></td>
+                            <td style={TD}><div style={{display:"flex",alignItems:"center",gap:9}}><div style={{width:30,height:30,borderRadius:"50%",background:avatarColor(c.name),display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>{initials(c.name)}</div><div><div style={{fontWeight:600,fontSize:13}}>{c.name}</div><div style={{fontSize:11,color:muted}}>{(c.phone_code&&c.phone_code!=="+351"?c.phone_code+" ":"")+c.phone}</div></div></div></td>
                             <td style={TD}><span style={{color:muted,fontSize:12}}>{(c.typologies||[]).join(", ")||"—"} · {(c.concelhos||[]).join(", ")||"—"}</span></td>
                             <td style={TD}><span style={{fontWeight:600,fontSize:13}}>{c.price_range||c.priceRange||"—"}</span></td>
                             <td style={{...TD,textAlign:"center"}}><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><div style={{width:48,height:5,background:border,borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:`${sc}%`,background:scC,borderRadius:4}}/></div><span style={{fontSize:11,fontWeight:700,color:scC}}>{sc}%</span></div></td>
@@ -2499,7 +2520,7 @@ function ImoPro() {
               {importPrev.slice(0,50).map((c,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",borderBottom:`1px solid ${border}`}}>
                   <div style={{width:28,height:28,borderRadius:"50%",background:teal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff"}}>{(c.name||"?")[0].toUpperCase()}</div>
-                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:text}}>{c.name||"Sem nome"}</div><div style={{fontSize:12,color:muted}}>{c.phone}{c.email?` · ${c.email}`:""}</div></div>
+                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:text}}>{c.name||"Sem nome"}</div><div style={{fontSize:12,color:muted}}>{(c.phone_code&&c.phone_code!=="+351"?c.phone_code+" ":"")+c.phone}{c.email?` · ${c.email}`:""}</div></div>
                 </div>
               ))}
               {importPrev.length>50&&<div style={{padding:"9px 14px",fontSize:12,color:muted}}>...e mais {importPrev.length-50} contactos</div>}
