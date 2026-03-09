@@ -1010,11 +1010,18 @@ function LoginScreen({dark}) {
         setLoading(false); return;
       }
 
-      // 1b. Fazer login imediatamente para ter sessão activa (necessário para RLS)
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: email.trim(), password: pass
-      });
-      if(signInErr) { setError("Conta criada mas erro ao entrar: " + signInErr.message); setLoading(false); return; }
+      // 1b. Usar a sessão que o signUp já criou (evita fazer login separado)
+      // O signUp com email confirm OFF já devolve uma sessão activa em data.session
+      if(data.session) {
+        await supabase.auth.setSession(data.session);
+      } else {
+        // Aguardar um momento e tentar login
+        await new Promise(r => setTimeout(r, 1500));
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: email.trim(), password: pass
+        });
+        if(signInErr) { setError("Conta criada! Entra com o teu email e palavra-passe."); setLoading(false); return; }
+      }
 
       // 1c. Upload da foto agora que temos sessão activa
       let finalPhotoUrl = "";
@@ -1662,6 +1669,7 @@ function ImoPro() {
   const [search,    setSearch]    = useState("");
   const [filterInt, setFilterInt] = useState("");
   const [notif,     setNotif]     = useState(null);
+  const [pwaPrompt, setPwaPrompt] = useState(null); // PWA install prompt
   const [editContact,   setEditContact]  = useState(null);
   const [isNewContact,  setIsNewContact] = useState(false);
   const [editProperty,  setEditProperty] = useState(null);
@@ -1726,6 +1734,14 @@ function ImoPro() {
       },1000);
     }
   },[session]);
+
+  // ── PWA install prompt ──
+  useEffect(()=>{
+    const handler = () => { if(window.pwaInstallPrompt) setPwaPrompt(window.pwaInstallPrompt); };
+    window.addEventListener('pwaInstallAvailable', handler);
+    if(window.pwaInstallPrompt) setPwaPrompt(window.pwaInstallPrompt);
+    return () => window.removeEventListener('pwaInstallAvailable', handler);
+  },[]);
 
   const loadProfile = async()=>{
     const {data} = await supabase.from("profiles").select("*").eq("id",session.user.id).single();
@@ -1991,6 +2007,13 @@ function ImoPro() {
               <button onClick={()=>setShowProfileModal(true)} title="Editar perfil" style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4,flexShrink:0}}>
                 <span className="material-icons-outlined" style={{fontSize:18}}>edit</span>
               </button>
+              {pwaPrompt&&<button onClick={async()=>{
+                  pwaPrompt.prompt();
+                  const {outcome}=await pwaPrompt.userChoice;
+                  if(outcome==="accepted"){setPwaPrompt(null);showNotif("✅ ImoMatch instalado!");}
+                }} title="Instalar app" style={{background:teal,border:"none",cursor:"pointer",color:"#fff",padding:"4px 8px",borderRadius:6,fontSize:11,fontWeight:700,flexShrink:0}}>
+                ⬇ App
+              </button>}
               <button onClick={()=>supabase.auth.signOut()} title="Sair" style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4,flexShrink:0}}>
                 <span className="material-icons-outlined" style={{fontSize:18}}>logout</span>
               </button>
