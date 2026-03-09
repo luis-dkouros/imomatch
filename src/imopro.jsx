@@ -813,6 +813,17 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
 
+  // ── Estado do plano ──
+  const TRIAL_DAYS_PM = 3;
+  const userPlanPM    = (profile?.plan||"trial").toLowerCase();
+  const trialStart    = profile?.created_at ? new Date(profile.created_at) : new Date();
+  const trialDaysLeft = Math.max(0, TRIAL_DAYS_PM - Math.floor((new Date()-trialStart)/(1000*60*60*24)));
+  const isBasicPM     = userPlanPM === "basic";
+  const isTrialPM     = false;
+  const planColor     = isBasicPM ? teal : isTrialPM ? "#f59e0b" : "#ef4444";
+  const planLabel     = isBasicPM ? "✦ Basic — Activo" : "⚠️ Sem subscrição activa";
+  const planDesc      = isBasicPM ? "Acesso completo a todas as funcionalidades." : "Subscreve o plano Basic para aceder ao sistema.";
+
   const handlePhoto = async (e) => {
     const file = e.target.files[0]; if(!file) return;
     setUploading(true); setError("");
@@ -893,6 +904,26 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
           <textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder="Ex: Consultor imobiliário com 10 anos de experiência no Grande Porto..." style={{...INP,resize:"vertical",width:"100%"}} rows={4}/>
         </div>
 
+        {/* Card de plano */}
+        <div style={{background:`${planColor}11`,border:`1px solid ${planColor}33`,borderRadius:12,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:planColor}}>{planLabel}</div>
+            <div style={{fontSize:12,color:muted,marginTop:2}}>{planDesc}</div>
+          </div>
+          {!isBasicPM&&(
+            <a href={process.env.REACT_APP_STRIPE_LINK||"#"} target="_blank" rel="noreferrer"
+              style={{background:teal,color:"#fff",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
+              ⬆ Subscrever Basic
+            </a>
+          )}
+          {isBasicPM&&(
+            <a href={process.env.REACT_APP_STRIPE_PORTAL||"#"} target="_blank" rel="noreferrer"
+              style={{background:inp,color:muted,border:`1px solid ${border}`,borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
+              Gerir Subscrição
+            </a>
+          )}
+        </div>
+
         <div style={{display:"flex",gap:10,marginTop:4}}>
           <button onClick={save} disabled={loading||uploading} style={{...BTNP,flex:1,justifyContent:"center",opacity:(loading||uploading)?0.7:1}}>
             {loading?"A guardar...":"Guardar Perfil"}
@@ -905,87 +936,240 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
 }
 
 function LoginScreen({dark}) {
-  const [mode,  setMode]  = useState("login"); // "login" | "signup"
-  const [name,  setName]  = useState("");
-  const [email, setEmail] = useState("");
-  const [pass,  setPass]  = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const teal="#3BB2A1";
-  const bg    = dark?"#0f172a":"#f1f5f9";
-  const card  = dark?"#1e293b":"#ffffff";
-  const border= dark?"#334155":"#e2e8f0";
-  const text  = dark?"#f1f5f9":"#0f172a";
-  const muted = dark?"#94a3b8":"#64748b";
-  const inp   = dark?"#0f172a":"#f8fafc";
-  const inpB  = dark?"#334155":"#cbd5e1";
-  const INP = {background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"10px 13px",color:text,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"};
+  const [mode,     setMode]     = useState("login");
+  // login fields
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPass,  setLoginPass]  = useState("");
+  // signup fields
+  const [email,    setEmail]    = useState("");
+  const [pass,     setPass]     = useState("");
+  const [name,     setName]     = useState("");
+  const [phone,    setPhone]    = useState("");
+  const [agency,   setAgency]   = useState("");
+  const [bio,      setBio]      = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [uploading,setUploading]= useState(false);
+  const [error,    setError]    = useState("");
+  const [loading,  setLoading]  = useState(false);
 
-  const handle = async () => {
+  const teal  = "#3BB2A1";
+  const bg    = dark ? "#0f172a" : "#f1f5f9";
+  const card  = dark ? "#1e293b" : "#ffffff";
+  const border= dark ? "#334155" : "#e2e8f0";
+  const text  = dark ? "#f1f5f9" : "#0f172a";
+  const muted = dark ? "#94a3b8" : "#64748b";
+  const inp   = dark ? "#0f172a" : "#f8fafc";
+  const inpB  = dark ? "#334155" : "#cbd5e1";
+  const INP   = {background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"10px 13px",color:text,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"};
+  const LBL   = {display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:5,textTransform:"uppercase",letterSpacing:"0.06em"};
+
+  // ── Login ──
+  const handleLogin = async () => {
+    if(!loginEmail.trim()||!loginPass) { setError("Preenche email e palavra-passe."); return; }
     setLoading(true); setError("");
-    try {
-      if(mode==="login") {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
-        if(error) setError(error.message==="Invalid login credentials"?"Email ou palavra-passe incorrectos.":error.message);
-      } else {
-        if(!name.trim()) { setError("Indica o teu nome."); setLoading(false); return; }
-        const prodUrl = process.env.REACT_APP_SITE_URL || window.location.origin;
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(), password: pass,
-          options: {
-            data: { name: name.trim() },
-            emailRedirectTo: prodUrl
-          }
-        });
-        if(error) setError(error.message);
-        else setError("✅ Conta criada! Verifica o teu email para confirmar.");
-      }
-    } catch(e) { setError("Erro de ligação. Tenta novamente."); }
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPass });
+    if(error) setError(error.message === "Invalid login credentials" ? "Email ou palavra-passe incorrectos." : error.message);
     setLoading(false);
   };
 
+  // ── Upload foto ──
+  const handlePhoto = async (e) => {
+    const file = e.target.files[0]; if(!file) return;
+    setUploading(true);
+    const ext  = file.name.split(".").pop();
+    const path = `signup/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("property-photos").upload(path, file, {contentType:file.type, upsert:true});
+    if(upErr) { setError("Erro ao carregar foto."); setUploading(false); return; }
+    const { data:{ publicUrl } } = supabase.storage.from("property-photos").getPublicUrl(path);
+    setPhotoUrl(publicUrl);
+    setUploading(false);
+  };
+
+  // ── Signup: criar conta + perfil + ir para Stripe ──
+  const handleSignup = async () => {
+    if(!name.trim())          { setError("O nome é obrigatório."); return; }
+    if(!email.trim())         { setError("O email é obrigatório."); return; }
+    if(pass.length < 6)       { setError("A palavra-passe deve ter mínimo 6 caracteres."); return; }
+    setLoading(true); setError("");
+    try {
+      // 1. Criar conta Supabase
+      const { data, error: signUpErr } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: pass,
+        options: { data: { name: name.trim() } }
+      });
+      if(signUpErr) { setError(signUpErr.message); setLoading(false); return; }
+
+      const userId = data?.user?.id;
+      if(!userId) { setError("Erro ao criar conta. Tenta novamente."); setLoading(false); return; }
+
+      // 2. Guardar perfil
+      await supabase.from("profiles").upsert({
+        id:        userId,
+        name:      name.trim(),
+        phone:     phone.trim(),
+        agency:    agency.trim(),
+        bio:       bio.trim(),
+        photo_url: photoUrl,
+        plan:      "pending",
+        updated_at: new Date().toISOString()
+      });
+
+      // 3. Ir para Stripe Checkout
+      const stripeLink = process.env.REACT_APP_STRIPE_LINK || "#";
+      const url = new URL(stripeLink);
+      url.searchParams.set("client_reference_id", userId);
+      url.searchParams.set("prefilled_email", email.trim());
+      window.location.href = url.toString();
+
+    } catch(e) { setError("Erro de ligação. Tenta novamente."); setLoading(false); }
+  };
+
   return (
-    <div style={{minHeight:"100vh",background:bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Inter',sans-serif"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <div style={{minHeight:"100vh",background:bg,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"'Inter',sans-serif"}}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
-      <div style={{width:"100%",maxWidth:400}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <img src={LOGO_URL} alt="ImoMatch" style={{height:72,objectFit:"contain",marginBottom:12}}/>
-          <p style={{fontSize:14,color:muted,marginTop:4}}>Gestão Imobiliária Profissional</p>
+
+      <div style={{width:"100%",maxWidth:460}}>
+        {/* Logo */}
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <img src={LOGO_URL} alt="ImoMatch" style={{height:64,objectFit:"contain",marginBottom:8}}/>
+          <p style={{fontSize:14,color:muted}}>Gestão Imobiliária Profissional</p>
         </div>
-        <div style={{background:card,border:`1px solid ${border}`,borderRadius:16,padding:28}}>
+
+        <div style={{background:card,border:`1px solid ${border}`,borderRadius:18,padding:28,boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
+
           {/* Tabs */}
           <div style={{display:"flex",marginBottom:24,background:inp,borderRadius:10,padding:4}}>
             {[["login","Entrar"],["signup","Criar conta"]].map(([m,l])=>(
-              <button key={m} onClick={()=>{setMode(m);setError("");}} style={{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,background:mode===m?card:"transparent",color:mode===m?text:muted,boxShadow:mode===m?"0 1px 4px rgba(0,0,0,0.1)":"none",transition:"all 0.15s"}}>{l}</button>
+              <button key={m} onClick={()=>{setMode(m);setError("");}}
+                style={{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,
+                  background:mode===m?card:"transparent",color:mode===m?text:muted,
+                  boxShadow:mode===m?"0 1px 4px rgba(0,0,0,0.1)":"none",transition:"all 0.15s"}}>
+                {l}
+              </button>
             ))}
           </div>
 
-          {mode==="signup"&&<div style={{marginBottom:14}}>
-            <label style={{display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Nome</label>
-            <input value={name} onChange={e=>setName(e.target.value)} placeholder="O teu nome" style={INP}/>
-          </div>}
-          <div style={{marginBottom:14}}>
-            <label style={{display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Email</label>
-            <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="o_teu@email.pt" style={INP}/>
-          </div>
-          <div style={{marginBottom:20}}>
-            <label style={{display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Palavra-passe</label>
-            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} placeholder="••••••••" style={INP}/>
-            {mode==="signup"&&<div style={{fontSize:11,color:muted,marginTop:4}}>Mínimo 6 caracteres</div>}
-          </div>
+          {error&&(
+            <div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:8,padding:"10px 14px",color:"#ef4444",fontSize:13,marginBottom:16}}>
+              {error}
+            </div>
+          )}
 
-          {error&&<div style={{background:error.startsWith("✅")?"#10b98111":"#ef444411",border:`1px solid ${error.startsWith("✅")?"#10b98133":"#ef444433"}`,borderRadius:8,padding:"10px 14px",color:error.startsWith("✅")?"#10b981":"#ef4444",fontSize:13,marginBottom:14}}>{error}</div>}
+          {/* ── LOGIN ── */}
+          {mode==="login"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div>
+                <label style={LBL}>Email</label>
+                <input value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                  placeholder="o_teu@email.pt" style={INP}/>
+              </div>
+              <div>
+                <label style={LBL}>Palavra-passe</label>
+                <input type="password" value={loginPass} onChange={e=>setLoginPass(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                  placeholder="••••••••" style={INP}/>
+              </div>
+              <button onClick={handleLogin} disabled={loading}
+                style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:8,padding:"12px",fontWeight:700,cursor:"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1,marginTop:4}}>
+                {loading
+                  ?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A entrar...</>
+                  :<><span className="material-icons-outlined" style={{fontSize:18}}>login</span>Entrar</>}
+              </button>
+            </div>
+          )}
 
-          <button onClick={handle} disabled={loading} style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:8,padding:"11px",fontWeight:700,cursor:loading?"not-allowed":"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1}}>
-            {loading
-              ?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A processar...</>
-              :mode==="login"
-                ?<><span className="material-icons-outlined" style={{fontSize:18}}>login</span>Entrar</>
-                :<><span className="material-icons-outlined" style={{fontSize:18}}>person_add</span>Criar conta</>
-            }
-          </button>
+          {/* ── SIGNUP ── */}
+          {mode==="signup"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:13}}>
+
+              {/* Foto */}
+              <div style={{display:"flex",alignItems:"center",gap:14}}>
+                <div style={{flexShrink:0}}>
+                  {photoUrl
+                    ?<img src={photoUrl} alt="" style={{width:60,height:60,borderRadius:"50%",objectFit:"cover",border:`3px solid ${teal}`}}/>
+                    :<div style={{width:60,height:60,borderRadius:"50%",background:`${teal}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,border:`2px dashed ${teal}`}}>👤</div>}
+                </div>
+                <div>
+                  <label style={LBL}>Foto de perfil</label>
+                  <label style={{display:"inline-flex",alignItems:"center",gap:6,background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"7px 12px",cursor:"pointer",fontSize:13,color:text,fontWeight:600}}>
+                    <span className="material-icons-outlined" style={{fontSize:15}}>{uploading?"autorenew":"upload"}</span>
+                    {uploading?"A carregar...":"Carregar foto"}
+                    <input type="file" accept="image/*" onChange={handlePhoto} style={{display:"none"}} disabled={uploading}/>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label style={LBL}>Nome completo *</label>
+                <input value={name} onChange={e=>setName(e.target.value)} placeholder="O teu nome" style={INP}/>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div>
+                  <label style={LBL}>Email *</label>
+                  <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@exemplo.pt" style={INP}/>
+                </div>
+                <div>
+                  <label style={LBL}>Palavra-passe *</label>
+                  <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Mín. 6 caracteres" style={INP}/>
+                </div>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div>
+                  <label style={LBL}>Telefone / WhatsApp</label>
+                  <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+351 9XX XXX XXX" style={INP}/>
+                </div>
+                <div>
+                  <label style={LBL}>Agência / Empresa</label>
+                  <input value={agency} onChange={e=>setAgency(e.target.value)} placeholder="Nome da agência" style={INP}/>
+                </div>
+              </div>
+
+              <div>
+                <label style={LBL}>Apresentação <span style={{fontWeight:400,textTransform:"none",fontSize:10}}>(aparece na landing page)</span></label>
+                <textarea value={bio} onChange={e=>setBio(e.target.value)}
+                  placeholder="Ex: Consultor imobiliário com 10 anos de experiência..."
+                  style={{...INP,resize:"vertical"}} rows={3}/>
+              </div>
+
+              {/* Card do plano */}
+              <div style={{background:`${teal}09`,border:`1px solid ${teal}33`,borderRadius:12,padding:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div style={{fontSize:15,fontWeight:800,color:text}}>Plano Basic</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:2}}>
+                    <span style={{fontSize:22,fontWeight:800,color:teal}}>4,90€</span>
+                    <span style={{fontSize:12,color:muted}}>/mês</span>
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                  {["Contactos ilimitados","Imóveis ilimitados","Landing pages públicas","Campanhas WhatsApp","Matches automáticos","Suporte prioritário"].map((f,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:muted}}>
+                      <span style={{color:"#10b981",fontWeight:700}}>✓</span>{f}
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontSize:11,color:muted,marginTop:10,textAlign:"center"}}>Cobrado mensalmente · Cancela a qualquer momento</div>
+              </div>
+
+              <button onClick={handleSignup} disabled={loading||uploading}
+                style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"13px",fontWeight:700,cursor:"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(loading||uploading)?0.7:1}}>
+                {loading
+                  ?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A processar...</>
+                  :<><span className="material-icons-outlined" style={{fontSize:18}}>credit_card</span>Criar conta e pagar 4,90€/mês</>}
+              </button>
+
+              <div style={{textAlign:"center",fontSize:11,color:muted}}>
+                Ao criar conta aceitas os nossos termos de serviço.<br/>
+                Pagamento seguro via <strong>Stripe</strong>.
+              </div>
+            </div>
+          )}
         </div>
+
         <p style={{textAlign:"center",fontSize:12,color:muted,marginTop:16}}>ImoMatch © {new Date().getFullYear()}</p>
       </div>
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
@@ -995,7 +1179,6 @@ function LoginScreen({dark}) {
 
 const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"}];
 const PLAN_LIMITS={trial:{contacts:Infinity,properties:Infinity},basic:{contacts:Infinity,properties:Infinity}};
-const TRIAL_DAYS=3;
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
 const STRIPE_PORTAL=process.env.REACT_APP_STRIPE_PORTAL||"https://billing.stripe.com/p/login/YOUR_PORTAL_LINK";
 function openStripeCheckout(userId, email) {
@@ -1490,19 +1673,25 @@ function ImoPro() {
   useEffect(()=>{
     const params = new URLSearchParams(window.location.search);
     if(params.get("payment")==="success"){
-      // Clean URL
       window.history.replaceState({},"",window.location.pathname);
-      // Poll until Supabase webhook updates the plan (max 10s)
-      let tries=0;
+      // Mostra loading enquanto webhook actualiza o plano (até 15s)
+      setNotif("⏳ A activar o teu plano...");
+      let tries = 0;
       const poll = setInterval(async()=>{
         tries++;
-        const {data} = await supabase.from("profiles").select("plan").eq("id",session?.user?.id).single();
-        if(data?.plan==="basic" || tries>=10){
+        const {data} = await supabase.from("profiles").select("plan,name,phone,agency,bio,photo_url,website,stripe_customer_id,created_at").eq("id",session?.user?.id).single();
+        if(data?.plan==="basic" || tries>=15){
           clearInterval(poll);
           if(data?.plan==="basic"){
-            setProfile(p=>({...p,plan:"basic"}));
-            setPage("billing");
-            showNotif("🎉 Plano Basic activado com sucesso!");
+            setProfile(data);
+            setPage("dashboard");
+            setNotif("🎉 Bem-vindo ao ImoMatch! O teu plano Basic está activo.");
+            setTimeout(()=>setNotif(null),5000);
+          } else {
+            // Webhook ainda não chegou — actualiza UI assim mesmo e aguarda
+            setProfile(p=>({...p,...data}));
+            setNotif("✅ Conta criada! O plano será activado em instantes.");
+            setTimeout(()=>setNotif(null),5000);
           }
         }
       },1000);
@@ -1550,12 +1739,11 @@ function ImoPro() {
     return ms&&mi;
   });
 
-  const userPlan=(profile?.plan||"trial").toLowerCase();
-  const trialStart = profile?.created_at ? new Date(profile.created_at) : new Date();
-  const trialDaysLeft = Math.max(0, TRIAL_DAYS - Math.floor((new Date()-trialStart)/(1000*60*60*24)));
-  const isTrialActive = userPlan==="trial" && trialDaysLeft>0;
+  const userPlan=(profile?.plan||"pending").toLowerCase();
   const isBasic = userPlan==="basic";
-  const hasAccess = isBasic || isTrialActive;
+  const isTrialActive = false;
+  const trialDaysLeft = 0;
+  const hasAccess = isBasic;
   const planLimits = PLAN_LIMITS[hasAccess?"basic":"trial"];
 
   // ── CRUD: Contacts ──
@@ -1769,7 +1957,7 @@ function ImoPro() {
               <div style={{width:30,height:30,borderRadius:"50%",background:teal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(currentUser?.name||"?")}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:600,color:text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser?.name||"..."}</div>
-                <div style={{fontSize:11,color:isBasic?teal:isTrialActive?"#f59e0b":"#ef4444",fontWeight:hasAccess?700:400}}>{isBasic?"✦ Basic":isTrialActive?`🕐 Trial (${trialDaysLeft}d)`:"⚠️ Expirado"}</div>
+                <div style={{fontSize:11,color:isBasic?teal:isTrialActive?"#f59e0b":"#ef4444",fontWeight:hasAccess?700:400}}>{isBasic?"✦ Basic Activo":"⚠️ Sem subscrição"}</div>
               </div>
               <button onClick={()=>setShowProfileModal(true)} title="Editar perfil" style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4,flexShrink:0}}>
                 <span className="material-icons-outlined" style={{fontSize:18}}>edit</span>
@@ -2019,16 +2207,16 @@ function ImoPro() {
             {/* BILLING */}
             {page==="billing"&&<div>
               {/* Current Plan Banner */}
-              <div style={{...CARD,marginBottom:20,background:isBasic?`${teal}11`:isTrialActive?`#f59e0b11`:card,border:`1px solid ${isBasic?teal:isTrialActive?"#f59e0b":border}`,borderRadius:16}}>
+              <div style={{...CARD,marginBottom:20,background:isBasic?`${teal}11`:card,border:`1px solid ${isBasic?teal:border}`,borderRadius:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
                   <div>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                      <span style={{fontSize:22}}>{isBasic?"⭐":isTrialActive?"🕐":"⚠️"}</span>
-                      <div style={{fontSize:20,fontWeight:800,color:text}}>Plano {isBasic?"Basic":isTrialActive?"Trial":"Expirado"}</div>
-                      <div style={{background:isBasic?teal:isTrialActive?"#f59e0b":"#ef4444",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{isBasic?"ACTIVO":isTrialActive?`${trialDaysLeft} DIA${trialDaysLeft!==1?"S":""} RESTANTE${trialDaysLeft!==1?"S":""}`:"EXPIRADO"}</div>
+                      <span style={{fontSize:22}}>{isBasic?"⭐":"⚠️"}</span>
+                      <div style={{fontSize:20,fontWeight:800,color:text}}>Plano {isBasic?"Basic":"Inactivo"}</div>
+                      <div style={{background:isBasic?teal:"#ef4444",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{isBasic?"ACTIVO":"SEM SUBSCRIÇÃO"}</div>
                     </div>
                     <div style={{fontSize:13,color:muted}}>
-                      {isBasic?"Acesso completo a todas as funcionalidades.":isTrialActive?`Trial gratuito de ${TRIAL_DAYS} dias. Faz upgrade para continuar.`:"O teu trial expirou. Subscreve o plano Basic para continuar."}
+                      {isBasic?"Acesso completo a todas as funcionalidades.":"Subscreve o plano Basic para aceder a todas as funcionalidades."}
                     </div>
                   </div>
                   {isBasic?(
@@ -2074,7 +2262,7 @@ function ImoPro() {
               <div style={CARD}>
                 <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:14}}>Perguntas Frequentes</h3>
                 {[
-                  ["Como funciona o trial?",`Ao registares-te tens ${TRIAL_DAYS} dias gratuitos com acesso completo. Depois precisas subscrever.`],
+                  ["Como funciona a subscrição?","Ao criares conta és redireccionado para o Stripe para subscrever. O acesso é activado automaticamente após o pagamento."],
                   ["Como é feito o pagamento?","Via cartão de crédito/débito, MB Way ou Multibanco através da Stripe. Cobrado mensalmente."],
                   ["Posso cancelar a qualquer momento?","Sim. Cancelas no portal Stripe e o acesso mantém-se até ao fim do período pago."],
                   ["Como activar o Basic após pagamento?","O plano é activado automaticamente após o pagamento. Se não activar em 5 minutos, contacta o suporte."],
@@ -2130,12 +2318,9 @@ function ImoPro() {
         <div style={{position:"fixed",inset:0,zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.6)"}}>
           <div style={{background:card,borderRadius:20,padding:32,maxWidth:400,width:"92%",border:`1px solid ${border}`,textAlign:"center"}}>
             <div style={{fontSize:40,marginBottom:8}}>🚀</div>
-            <div style={{fontSize:20,fontWeight:800,color:text,marginBottom:8}}>{isTrialActive?"Trial a terminar":"Subscrição necessária"}</div>
+            <div style={{fontSize:20,fontWeight:800,color:text,marginBottom:8}}>Subscrição necessária</div>
             <div style={{fontSize:14,color:muted,marginBottom:20,lineHeight:1.6}}>
-              {isTrialActive
-                ?`O teu trial termina em ${trialDaysLeft} dia${trialDaysLeft!==1?"s":""}.`
-                :"O teu trial expirou."}<br/>
-              {showUpgrade.reason==="feature"?"Esta funcionalidade requer o plano Basic.":""}<br/>
+              {showUpgrade.reason==="feature"?"Esta funcionalidade requer o plano Basic.":"Precisas de uma subscrição activa para continuar."}<br/>
               Subscreve o plano <strong style={{color:teal}}>Basic</strong> por apenas <strong style={{color:teal}}>4,90€/mês</strong>.
             </div>
             <div style={{background:`${teal}11`,borderRadius:12,padding:16,marginBottom:20,textAlign:"left"}}>
