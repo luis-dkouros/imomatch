@@ -2322,8 +2322,8 @@ function ImoPro() {
                     {pwaPrompt&&(
                       <button onClick={async()=>{
                         pwaPrompt.prompt();
-                        const {{outcome}}=await pwaPrompt.userChoice;
-                        if(outcome==="accepted"){{setPwaPrompt(null);showNotif("✅ ImoMatch instalado!");}}
+                        const {outcome}=await pwaPrompt.userChoice;
+                        if(outcome==="accepted"){setPwaPrompt(null);showNotif("✅ ImoMatch instalado!");}
                       }} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
                         <span className="material-icons-outlined" style={{fontSize:16}}>download</span>Instalar agora
                       </button>
