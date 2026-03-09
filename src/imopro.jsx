@@ -975,14 +975,18 @@ function LoginScreen({dark}) {
   // ── Upload foto ──
   const handlePhoto = async (e) => {
     const file = e.target.files[0]; if(!file) return;
-    setUploading(true);
-    const ext  = file.name.split(".").pop();
-    const path = `signup/avatar-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("property-photos").upload(path, file, {contentType:file.type, upsert:true});
-    if(upErr) { setError("Erro ao carregar foto."); setUploading(false); return; }
-    const { data:{ publicUrl } } = supabase.storage.from("property-photos").getPublicUrl(path);
-    setPhotoUrl(publicUrl);
-    setUploading(false);
+    setUploading(true); setError("");
+    // Guardar ficheiro localmente para upload após login
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Guardar como data URL temporariamente — será re-uploaded após criar conta
+      setPhotoUrl(reader.result);
+      setUploading(false);
+    };
+    reader.onerror = () => { setError("Erro ao ler foto."); setUploading(false); };
+    reader.readAsDataURL(file);
+    // Guardar o ficheiro para upload posterior
+    window._signupPhotoFile = file;
   };
 
   // ── Signup: criar conta + perfil + ir para Stripe ──
@@ -1002,19 +1006,38 @@ function LoginScreen({dark}) {
 
       const userId = data?.user?.id;
       if(!userId) {
-        // Supabase devolveu user null — confirmação de email pode estar activa
-        setError("Erro ao criar conta. Verifica se o email já existe ou se a confirmação de email está desactivada no Supabase (Authentication → Providers → Email → Confirm email OFF).");
+        setError("Erro ao criar conta. O email pode já estar registado ou a confirmação de email está activa no Supabase.");
         setLoading(false); return;
       }
 
-      // 2. Guardar perfil
+      // 1b. Fazer login imediatamente para ter sessão activa (necessário para RLS)
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(), password: pass
+      });
+      if(signInErr) { setError("Conta criada mas erro ao entrar: " + signInErr.message); setLoading(false); return; }
+
+      // 1c. Upload da foto agora que temos sessão activa
+      let finalPhotoUrl = "";
+      if(window._signupPhotoFile) {
+        const file = window._signupPhotoFile;
+        const ext  = file.name.split(".").pop();
+        const photoPath = `${userId}/avatar-${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("property-photos").upload(photoPath, file, {contentType:file.type, upsert:true});
+        if(!upErr) {
+          const { data:{ publicUrl } } = supabase.storage.from("property-photos").getPublicUrl(photoPath);
+          finalPhotoUrl = publicUrl;
+        }
+        window._signupPhotoFile = null;
+      }
+
+      // 2. Guardar perfil (agora com sessão activa)
       const { error: profileErr } = await supabase.from("profiles").upsert({
         id:        userId,
         name:      name.trim(),
         phone:     phone.trim(),
         agency:    agency.trim(),
         bio:       bio.trim(),
-        photo_url: photoUrl,
+        photo_url: finalPhotoUrl || photoUrl,
         plan:      "pending",
         updated_at: new Date().toISOString()
       });
