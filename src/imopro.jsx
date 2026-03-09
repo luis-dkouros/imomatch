@@ -2288,7 +2288,7 @@ function ImoPro() {
                     <span style={{fontSize:32,fontWeight:800,color:teal}}>4,90€</span>
                     <span style={{fontSize:13,color:muted}}>/mês</span>
                   </div>
-                  <div style={{fontSize:12,color:muted,marginTop:4}}>3 dias gratuitos no registo</div>
+                  
                 </div>
                 {[
                   {t:"Contactos ilimitados",ok:true},{t:"Imóveis ilimitados",ok:true},{t:"Matches automáticos",ok:true},
@@ -2308,6 +2308,31 @@ function ImoPro() {
                 {isBasic&&(
                   <div style={{background:`${teal}18`,borderRadius:8,padding:"10px 14px",marginTop:16,textAlign:"center",fontSize:13,color:teal,fontWeight:600}}>✓ Plano actual</div>
                 )}
+              </div>
+
+              {/* Instalar App */}
+              <div style={{...CARD,borderRadius:16,marginBottom:20,background:`${teal}08`,border:`1px solid ${teal}33`}}>
+                <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                  <div style={{fontSize:36}}>📱</div>
+                  <div style={{flex:1,minWidth:180}}>
+                    <div style={{fontSize:15,fontWeight:700,color:text,marginBottom:4}}>Instalar como App</div>
+                    <div style={{fontSize:13,color:muted,lineHeight:1.5}}>Adiciona o ImoMatch ao ecrã inicial do teu telemóvel para acesso rápido, sem browser.</div>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
+                    {pwaPrompt&&(
+                      <button onClick={async()=>{
+                        pwaPrompt.prompt();
+                        const {{outcome}}=await pwaPrompt.userChoice;
+                        if(outcome==="accepted"){{setPwaPrompt(null);showNotif("✅ ImoMatch instalado!");}}
+                      }} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
+                        <span className="material-icons-outlined" style={{fontSize:16}}>download</span>Instalar agora
+                      </button>
+                    )}
+                    <button onClick={()=>window.open("/instalar.html","_blank")} style={{background:inp,color:text,border:`1px solid ${border}`,borderRadius:8,padding:"9px 16px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
+                      <span className="material-icons-outlined" style={{fontSize:16}}>help_outline</span>Ver instruções
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* FAQ */}
