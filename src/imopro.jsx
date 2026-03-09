@@ -1209,7 +1209,7 @@ function LoginScreen({dark}) {
 }
 
 const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"}];
-const PLAN_LIMITS={trial:{contacts:Infinity,properties:Infinity},basic:{contacts:Infinity,properties:Infinity}};
+const PLAN_LIMITS={pending:{contacts:0,properties:0},trial:{contacts:0,properties:0},basic:{contacts:Infinity,properties:Infinity}};
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
 const STRIPE_PORTAL=process.env.REACT_APP_STRIPE_PORTAL||"https://billing.stripe.com/p/login/YOUR_PORTAL_LINK";
 function openStripeCheckout(userId, email) {
@@ -1781,10 +1781,11 @@ function ImoPro() {
 
   const userPlan=(profile?.plan||"pending").toLowerCase();
   const isBasic = userPlan==="basic";
+  const isPending = userPlan==="pending" || userPlan==="expired" || userPlan==="past_due";
   const isTrialActive = false;
   const trialDaysLeft = 0;
   const hasAccess = isBasic;
-  const planLimits = PLAN_LIMITS[hasAccess?"basic":"trial"];
+  const planLimits = PLAN_LIMITS[userPlan] || PLAN_LIMITS["pending"];
 
   // ── CRUD: Contacts ──
   const saveContact = async()=>{
@@ -1944,6 +1945,44 @@ function ImoPro() {
 
   if(!session) return <LoginScreen dark={dark}/>;
 
+  // ── Gate: plano pending/expired → forçar pagamento ──
+  const currentPlan = (profile?.plan||"pending").toLowerCase();
+  if(profile && (currentPlan==="pending" || currentPlan==="expired")) {
+    const stripeLink = process.env.REACT_APP_STRIPE_LINK||"#";
+    const stripeUrl = stripeLink!=="#" ? (()=>{
+      const u=new URL(stripeLink);
+      u.searchParams.set("client_reference_id",session.user.id);
+      u.searchParams.set("prefilled_email",session.user.email);
+      return u.toString();
+    })() : "#";
+    return (
+      <div style={{minHeight:"100vh",background:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"Inter,sans-serif"}}>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+        <div style={{width:"100%",maxWidth:420,textAlign:"center"}}>
+          <img src={LOGO_URL} alt="ImoMatch" style={{height:60,objectFit:"contain",marginBottom:24}}/>
+          <div style={{background:"#fff",borderRadius:20,padding:32,boxShadow:"0 4px 24px rgba(0,0,0,.08)"}}>
+            <div style={{fontSize:40,marginBottom:16}}>🔒</div>
+            <div style={{fontSize:22,fontWeight:800,color:"#0f172a",marginBottom:8}}>
+              {currentPlan==="expired" ? "Subscrição expirada" : "Pagamento pendente"}
+            </div>
+            <div style={{fontSize:14,color:"#64748b",marginBottom:28,lineHeight:1.6}}>
+              {currentPlan==="expired"
+                ? "A tua subscrição expirou. Renova para continuares a aceder ao ImoMatch."
+                : "A tua conta foi criada mas o pagamento ainda não foi concluído. Subscreve para aceder ao ImoMatch."}
+            </div>
+            <a href={stripeUrl} style={{display:"block",background:"#3BB2A1",color:"#fff",borderRadius:12,padding:"14px 20px",fontWeight:700,fontSize:16,textDecoration:"none",marginBottom:12}}>
+              💳 {currentPlan==="expired" ? "Renovar subscrição" : "Subscrever por 4,90€/mês"}
+            </a>
+            <button onClick={()=>supabase.auth.signOut()} style={{background:"none",border:"none",color:"#94a3b8",fontSize:13,cursor:"pointer",fontFamily:"inherit",marginTop:8}}>
+              Sair
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{fontFamily:"'Inter',sans-serif",background:bg,minHeight:"100vh",color:text,transition:"all 0.2s"}}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -2074,6 +2113,29 @@ function ImoPro() {
           </div>}
 
           <main style={{flex:1,overflowY:"auto",padding:isMobile?14:26}}>
+
+            {/* BLOQUEIO — conta sem subscrição */}
+            {isPending&&page!=="billing"&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+              <div style={{background:card,borderRadius:20,padding:isMobile?"24px 20px":36,maxWidth:440,width:"100%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.4)"}}>
+                <div style={{fontSize:48,marginBottom:12}}>🔒</div>
+                <div style={{fontSize:20,fontWeight:800,color:text,marginBottom:8}}>Subscrição necessária</div>
+                <div style={{fontSize:14,color:muted,lineHeight:1.6,marginBottom:24}}>
+                  A tua conta foi criada mas ainda não tem uma subscrição activa.<br/>
+                  Subscreve o plano Basic para aceder a todas as funcionalidades.
+                </div>
+                <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email)}
+                  style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:12,padding:"14px 20px",fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>
+                  ⭐ Subscrever Basic — 4,90€/mês
+                </button>
+                <button onClick={()=>setPage("billing")}
+                  style={{width:"100%",background:"none",color:muted,border:`1px solid ${border}`,borderRadius:12,padding:"10px 20px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                  Ver detalhes do plano
+                </button>
+                <div style={{marginTop:16,fontSize:12,color:muted}}>
+                  Já pagaste? <button onClick={loadProfile} style={{background:"none",border:"none",color:teal,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,padding:0}}>Clica aqui para verificar</button>
+                </div>
+              </div>
+            </div>}
 
             {/* INÍCIO */}
             {page==="dashboard"&&<div>
