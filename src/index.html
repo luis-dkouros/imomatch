@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!-- PWA Theme -->
+    <meta name="theme-color" content="#3BB2A1" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- SEO -->
+    <meta name="description" content="ImoMatch - Gestão Imobiliária Profissional" />
+    <meta name="application-name" content="ImoMatch" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ImoMatch" />
+    <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
+
+    <!-- Android / Windows -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="msapplication-TileColor" content="#3BB2A1" />
+    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96x96.png" />
+
+    <title>ImoMatch</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: 'Inter', sans-serif; }
+      #root { min-height: 100vh; }
+      #splash {
+        position: fixed; inset: 0;
+        background: #0f172a;
+        display: flex; align-items: center; justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.4s ease;
+      }
+      #splash.hidden { opacity: 0; pointer-events: none; }
+      #splash img { width: 120px; animation: pulse 1.5s ease-in-out infinite; }
+      @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.7;transform:scale(.95)} }
+    </style>
+  </head>
+  <body>
+    <noscript>É necessário JavaScript para utilizar o ImoMatch.</noscript>
+
+    <div id="splash">
+      <img src="/icons/icon-192x192.png" alt="ImoMatch" />
+    </div>
+
+    <div id="root"></div>
+
+    <script>
+      // Registar Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registado:', reg.scope))
+            .catch(err => console.log('SW erro:', err));
+        });
+      }
+
+      // Esconder splash
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const splash = document.getElementById('splash');
+          if (splash) {
+            splash.classList.add('hidden');
+            setTimeout(() => splash.remove(), 400);
+          }
+        }, 1000);
+      });
+
+      // Guardar prompt de instalação PWA
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        window.pwaInstallPrompt = deferredPrompt;
+        window.dispatchEvent(new CustomEvent('pwaInstallAvailable'));
+      });
+
+      window.addEventListener('appinstalled', () => {
+        window.pwaInstallPrompt = null;
+      });
+    </script>
+  </body>
+</html>
