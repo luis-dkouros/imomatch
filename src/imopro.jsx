@@ -1006,22 +1006,17 @@ function LoginScreen({dark}) {
 
       const userId = data?.user?.id;
       if(!userId) {
-        setError("Erro ao criar conta. O email pode já estar registado ou a confirmação de email está activa no Supabase.");
+        setError("Erro ao criar conta. O email pode já estar registado.");
         setLoading(false); return;
       }
 
-      // 1b. Usar a sessão que o signUp já criou (evita fazer login separado)
-      // O signUp com email confirm OFF já devolve uma sessão activa em data.session
-      if(data.session) {
-        await supabase.auth.setSession(data.session);
-      } else {
-        // Aguardar um momento e tentar login
-        await new Promise(r => setTimeout(r, 1500));
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: email.trim(), password: pass
-        });
-        if(signInErr) { setError("Conta criada! Entra com o teu email e palavra-passe."); setLoading(false); return; }
+      // 1b. Verificar se temos sessão (confirmação de email deve estar DESACTIVADA no Supabase)
+      if(!data.session) {
+        // Sem sessão = confirmação de email está activa → não conseguimos prosseguir para Stripe
+        setError("⚠️ Confirmação de email está activa no Supabase. Desactiva em Authentication → Providers → Email → 'Confirm email'.");
+        setLoading(false); return;
       }
+      await supabase.auth.setSession(data.session);
 
       // 1c. Upload da foto agora que temos sessão activa
       let finalPhotoUrl = "";
@@ -2308,31 +2303,6 @@ function ImoPro() {
                 {isBasic&&(
                   <div style={{background:`${teal}18`,borderRadius:8,padding:"10px 14px",marginTop:16,textAlign:"center",fontSize:13,color:teal,fontWeight:600}}>✓ Plano actual</div>
                 )}
-              </div>
-
-              {/* Instalar App */}
-              <div style={{...CARD,borderRadius:16,marginBottom:20,background:`${teal}08`,border:`1px solid ${teal}33`}}>
-                <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                  <div style={{fontSize:36}}>📱</div>
-                  <div style={{flex:1,minWidth:180}}>
-                    <div style={{fontSize:15,fontWeight:700,color:text,marginBottom:4}}>Instalar como App</div>
-                    <div style={{fontSize:13,color:muted,lineHeight:1.5}}>Adiciona o ImoMatch ao ecrã inicial do teu telemóvel para acesso rápido, sem browser.</div>
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
-                    {pwaPrompt&&(
-                      <button onClick={async()=>{
-                        pwaPrompt.prompt();
-                        const {outcome}=await pwaPrompt.userChoice;
-                        if(outcome==="accepted"){setPwaPrompt(null);showNotif("✅ ImoMatch instalado!");}
-                      }} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
-                        <span className="material-icons-outlined" style={{fontSize:16}}>download</span>Instalar agora
-                      </button>
-                    )}
-                    <button onClick={()=>window.open("/instalar.html","_blank")} style={{background:inp,color:text,border:`1px solid ${border}`,borderRadius:8,padding:"9px 16px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
-                      <span className="material-icons-outlined" style={{fontSize:16}}>help_outline</span>Ver instruções
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {/* FAQ */}
