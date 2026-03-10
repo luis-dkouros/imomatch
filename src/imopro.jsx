@@ -1240,9 +1240,11 @@ function LoginScreen({dark}) {
 const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"},{id:"help",icon:"help_outline",label:"Ajuda"}];
 const PLAN_LIMITS={pending:{contacts:0,properties:0},trial:{contacts:0,properties:0},basic:{contacts:Infinity,properties:Infinity}};
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
+const STRIPE_LINK_30D=process.env.REACT_APP_STRIPE_LINK_30D||"https://buy.stripe.com/eVq14nbbK0K87Hv4dEcfK01";
 const STRIPE_PORTAL=process.env.REACT_APP_STRIPE_PORTAL||"https://billing.stripe.com/p/login/YOUR_PORTAL_LINK";
-function openStripeCheckout(userId, email) {
-  const url = new URL(STRIPE_LINK);
+function openStripeCheckout(userId, email, link) {
+  const base = link || STRIPE_LINK;
+  const url = new URL(base);
   if(userId) url.searchParams.set("client_reference_id", userId);
   if(email)  url.searchParams.set("prefilled_email", email);
   window.open(url.toString(), "_blank");
@@ -2003,9 +2005,14 @@ function ImoPro() {
                 ? "A tua subscrição expirou. Renova para continuares a aceder ao ImoMatch."
                 : "A tua conta foi criada mas o pagamento ainda não foi concluído. Subscreve para aceder ao ImoMatch."}
             </div>
-            <a href={stripeUrl} style={{display:"block",background:"#3BB2A1",color:"#fff",borderRadius:12,padding:"14px 20px",fontWeight:700,fontSize:16,textDecoration:"none",marginBottom:12}}>
-              💳 {currentPlan==="expired" ? "Renovar subscrição" : "Subscrever por 4,90€/mês"}
-            </a>
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
+              <a href={stripeUrl} style={{display:"block",background:"#3BB2A1",color:"#fff",borderRadius:12,padding:"13px 20px",fontWeight:700,fontSize:15,textDecoration:"none",textAlign:"center"}}>
+                ⭐ Subscrição Mensal — <span style={{textDecoration:"line-through",opacity:0.7,fontSize:13}}>6,90€</span> 4,90€/mês
+              </a>
+              <a href={(()=>{const u=new URL(STRIPE_LINK_30D);u.searchParams.set("client_reference_id",session.user.id);u.searchParams.set("prefilled_email",session.user.email);return u.toString();})()} style={{display:"block",background:"#fff",color:"#0f172a",border:"1px solid #e2e8f0",borderRadius:12,padding:"13px 20px",fontWeight:700,fontSize:15,textDecoration:"none",textAlign:"center"}}>
+                📅 Acesso 30 dias — <span style={{textDecoration:"line-through",opacity:0.5,fontSize:13}}>6,90€</span> 4,90€ · MB Way / Multibanco
+              </a>
+            </div>
             <button onClick={()=>supabase.auth.signOut()} style={{background:"none",border:"none",color:"#94a3b8",fontSize:13,cursor:"pointer",fontFamily:"inherit",marginTop:8}}>
               Sair
             </button>
@@ -2368,43 +2375,67 @@ function ImoPro() {
                 </div>
               </div>
 
-              {/* Plan card — only Basic */}
-              <div style={{...CARD,borderRadius:16,border:`2px solid ${teal}`,position:"relative",maxWidth:400,margin:"0 auto 20px"}}>
-                <div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>ÚNICO PLANO</div>
-                <div style={{textAlign:"center",paddingBottom:16,borderBottom:`1px solid ${border}`,marginBottom:16}}>
-                  <div style={{fontSize:18,fontWeight:700,color:text,marginBottom:8}}>Basic</div>
-                  <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:2}}>
-                    <span style={{fontSize:32,fontWeight:800,color:teal}}>4,90€</span>
-                    <span style={{fontSize:13,color:muted}}>/mês</span>
-                  </div>
-                  
+              {/* Features list */}
+              <div style={{...CARD,borderRadius:16,marginBottom:20}}>
+                <div style={{fontSize:13,fontWeight:700,color:text,marginBottom:12}}>✦ Todas as funcionalidades incluídas:</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {["Contactos ilimitados","Imóveis ilimitados","Matches automáticos","Landing pages públicas","Campanhas WhatsApp","Redes Sociais","Histórico de envios","Suporte prioritário"].map((f,fi)=>(
+                    <div key={fi} style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:13,color:"#10b981",fontWeight:700,flexShrink:0}}>✓</span>
+                      <span style={{fontSize:12,color:text}}>{f}</span>
+                    </div>
+                  ))}
                 </div>
-                {[
-                  {t:"Contactos ilimitados",ok:true},{t:"Imóveis ilimitados",ok:true},{t:"Matches automáticos",ok:true},
-                  {t:"Landing pages públicas",ok:true},{t:"Campanhas WhatsApp",ok:true},{t:"Redes Sociais",ok:true},{t:"Histórico de envios",ok:true},{t:"Suporte prioritário",ok:true}
-                ].map((f,fi)=>(
-                  <div key={fi} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                    <span style={{fontSize:14,color:"#10b981",fontWeight:700,flexShrink:0}}>✓</span>
-                    <span style={{fontSize:13,color:text}}>{f.t}</span>
-                  </div>
-                ))}
-                {!isBasic&&(
-                  <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email)}
-                    style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"12px 16px",fontWeight:700,fontSize:15,cursor:"pointer",marginTop:16,fontFamily:"inherit"}}>
-                    Subscrever por 4,90€/mês
-                  </button>
-                )}
-                {isBasic&&(
-                  <div style={{background:`${teal}18`,borderRadius:8,padding:"10px 14px",marginTop:16,textAlign:"center",fontSize:13,color:teal,fontWeight:600}}>✓ Plano actual</div>
-                )}
               </div>
+
+              {/* Two plan options */}
+              {!isBasic&&<div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:14,marginBottom:20}}>
+                {/* Mensal */}
+                <div style={{...CARD,borderRadius:16,border:`2px solid ${teal}`,position:"relative"}}>
+                  <div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>⭐ RECOMENDADO</div>
+                  <div style={{textAlign:"center",paddingBottom:14,borderBottom:`1px solid ${border}`,marginBottom:14}}>
+                    <div style={{fontSize:14,fontWeight:700,color:text,marginBottom:6}}>Subscrição Mensal</div>
+                    <div style={{fontSize:12,color:muted,textDecoration:"line-through",marginBottom:2}}>6,90€/mês</div>
+                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:2}}>
+                      <span style={{fontSize:28,fontWeight:800,color:teal}}>4,90€</span>
+                      <span style={{fontSize:12,color:muted}}>/mês</span>
+                    </div>
+                    <div style={{fontSize:11,color:muted,marginTop:4}}>Renovação automática · Cartão</div>
+                  </div>
+                  <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email)}
+                    style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                    Subscrever
+                  </button>
+                </div>
+                {/* 30 dias */}
+                <div style={{...CARD,borderRadius:16,border:`2px solid ${border}`}}>
+                  <div style={{textAlign:"center",paddingBottom:14,borderBottom:`1px solid ${border}`,marginBottom:14}}>
+                    <div style={{fontSize:14,fontWeight:700,color:text,marginBottom:6}}>Acesso 30 dias</div>
+                    <div style={{fontSize:12,color:muted,textDecoration:"line-through",marginBottom:2}}>6,90€</div>
+                    <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:2}}>
+                      <span style={{fontSize:28,fontWeight:800,color:text}}>4,90€</span>
+                    </div>
+                    <div style={{fontSize:11,color:muted,marginTop:4}}>MB Way · Multibanco · Cartão</div>
+                  </div>
+                  <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email,STRIPE_LINK_30D)}
+                    style={{width:"100%",background:inp,color:text,border:`1px solid ${border}`,borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                    Comprar acesso
+                  </button>
+                </div>
+              </div>}
+              {isBasic&&(
+                <div style={{...CARD,borderRadius:16,marginBottom:20,background:`${teal}11`,border:`1px solid ${teal}`,textAlign:"center",padding:20}}>
+                  <div style={{fontSize:16,fontWeight:700,color:teal,marginBottom:4}}>✓ Plano Basic Activo</div>
+                  {profile?.plan_expires_at&&<div style={{fontSize:12,color:muted}}>Acesso até {new Date(profile.plan_expires_at).toLocaleDateString("pt-PT")}</div>}
+                </div>
+              )}
 
               {/* FAQ */}
               <div style={CARD}>
                 <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:14}}>Perguntas Frequentes</h3>
                 {[
                   ["Como funciona a subscrição?","Ao criares conta és redireccionado para o Stripe para subscrever. O acesso é activado automaticamente após o pagamento."],
-                  ["Como é feito o pagamento?","Via cartão de crédito/débito, MB Way ou Multibanco através da Stripe. Cobrado mensalmente."],
+                  ["Como é feito o pagamento?","Subscrição mensal via cartão (renovação automática). Ou acesso de 30 dias via cartão, MB Way ou Multibanco (renovação manual)."],
                   ["Posso cancelar a qualquer momento?","Sim. Cancelas no portal Stripe e o acesso mantém-se até ao fim do período pago."],
                   ["Como activar o Basic após pagamento?","O plano é activado automaticamente após o pagamento. Se não activar em 5 minutos, contacta o suporte."],
                 ].map(([q,a],i)=>(
