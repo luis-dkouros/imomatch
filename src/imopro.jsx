@@ -980,6 +980,7 @@ function LoginScreen({dark}) {
   const [uploading,setUploading]= useState(false);
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
+  const [signupPlan, setSignupPlan] = useState("mensal"); // "mensal" | "30dias"
 
   const teal  = "#3BB2A1";
   const bg    = dark ? "#0f172a" : "#f1f5f9";
@@ -1075,9 +1076,11 @@ function LoginScreen({dark}) {
       if(profileErr) { setError("Conta criada mas erro no perfil: " + profileErr.message); setLoading(false); return; }
 
       // 3. Ir para Stripe Checkout
-      const stripeLink = process.env.REACT_APP_STRIPE_LINK || "#";
-      if(stripeLink === "#") { setError("Link do Stripe não configurado (REACT_APP_STRIPE_LINK)."); setLoading(false); return; }
-      const url = new URL(stripeLink);
+      const baseLink = signupPlan === "30dias"
+        ? (process.env.REACT_APP_STRIPE_LINK_30D || "https://buy.stripe.com/eVq14nbbK0K87Hv4dEcfK01")
+        : (process.env.REACT_APP_STRIPE_LINK || "#");
+      if(baseLink === "#") { setError("Link do Stripe não configurado."); setLoading(false); return; }
+      const url = new URL(baseLink);
       url.searchParams.set("client_reference_id", userId);
       url.searchParams.set("prefilled_email", email.trim());
       window.location.href = url.toString();
@@ -1196,30 +1199,44 @@ function LoginScreen({dark}) {
                   style={{...INP,resize:"vertical"}} rows={3}/>
               </div>
 
-              {/* Card do plano */}
-              <div style={{background:`${teal}09`,border:`1px solid ${teal}33`,borderRadius:12,padding:16}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:15,fontWeight:800,color:text}}>Plano Basic</div>
-                  <div style={{display:"flex",alignItems:"baseline",gap:2}}>
-                    <span style={{fontSize:22,fontWeight:800,color:teal}}>4,90€</span>
-                    <span style={{fontSize:12,color:muted}}>/mês</span>
+              {/* Funcionalidades */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,background:`${teal}09`,border:`1px solid ${teal}22`,borderRadius:10,padding:12}}>
+                {["Contactos ilimitados","Imóveis ilimitados","Landing pages públicas","Campanhas WhatsApp","Matches automáticos","Suporte prioritário"].map((f,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:muted}}>
+                    <span style={{color:"#10b981",fontWeight:700}}>✓</span>{f}
                   </div>
+                ))}
+              </div>
+
+              {/* Selecção de plano */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                {/* Mensal */}
+                <div onClick={()=>setSignupPlan("mensal")}
+                  style={{borderRadius:12,border:`2px solid ${signupPlan==="mensal"?teal:inpB}`,padding:12,cursor:"pointer",background:signupPlan==="mensal"?`${teal}09`:inp,transition:"all 0.15s",textAlign:"center"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:signupPlan==="mensal"?teal:muted,marginBottom:4}}>⭐ MENSAL</div>
+                  <div style={{fontSize:11,color:muted,textDecoration:"line-through"}}>6,90€/mês</div>
+                  <div style={{fontSize:20,fontWeight:800,color:signupPlan==="mensal"?teal:text}}>4,90€<span style={{fontSize:11,fontWeight:400}}>/mês</span></div>
+                  <div style={{fontSize:10,color:muted,marginTop:4}}>Renovação automática</div>
+                  <div style={{fontSize:10,color:muted}}>Cartão</div>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
-                  {["Contactos ilimitados","Imóveis ilimitados","Landing pages públicas","Campanhas WhatsApp","Matches automáticos","Suporte prioritário"].map((f,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:muted}}>
-                      <span style={{color:"#10b981",fontWeight:700}}>✓</span>{f}
-                    </div>
-                  ))}
+                {/* 30 dias */}
+                <div onClick={()=>setSignupPlan("30dias")}
+                  style={{borderRadius:12,border:`2px solid ${signupPlan==="30dias"?teal:inpB}`,padding:12,cursor:"pointer",background:signupPlan==="30dias"?`${teal}09`:inp,transition:"all 0.15s",textAlign:"center"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:signupPlan==="30dias"?teal:muted,marginBottom:4}}>📅 30 DIAS</div>
+                  <div style={{fontSize:11,color:muted,opacity:0}}>&nbsp;</div>
+                  <div style={{fontSize:20,fontWeight:800,color:signupPlan==="30dias"?teal:text}}>6,90€</div>
+                  <div style={{fontSize:10,color:muted,marginTop:4}}>Renovação manual</div>
+                  <div style={{fontSize:10,color:muted}}>MB Way · Multibanco</div>
                 </div>
-                <div style={{fontSize:11,color:muted,marginTop:10,textAlign:"center"}}>Cobrado mensalmente · Cancela a qualquer momento</div>
               </div>
 
               <button onClick={handleSignup} disabled={loading||uploading}
                 style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"13px",fontWeight:700,cursor:"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(loading||uploading)?0.7:1}}>
                 {loading
                   ?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A processar...</>
-                  :<><span className="material-icons-outlined" style={{fontSize:18}}>credit_card</span>Criar conta e pagar 4,90€/mês</>}
+                  :<><span className="material-icons-outlined" style={{fontSize:18}}>credit_card</span>
+                    {signupPlan==="mensal" ? "Criar conta e pagar 4,90€/mês" : "Criar conta e pagar 6,90€ (30 dias)"}
+                  </>}
               </button>
 
               <div style={{textAlign:"center",fontSize:11,color:muted}}>
@@ -2007,10 +2024,10 @@ function ImoPro() {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
               <a href={stripeUrl} style={{display:"block",background:"#3BB2A1",color:"#fff",borderRadius:12,padding:"13px 20px",fontWeight:700,fontSize:15,textDecoration:"none",textAlign:"center"}}>
-                ⭐ Subscrição Mensal — <span style={{textDecoration:"line-through",opacity:0.7,fontSize:13}}>6,90€</span> 4,90€/mês
+                ⭐ Subscrição Mensal Promo — <span style={{textDecoration:"line-through",opacity:0.7,fontSize:13}}>6,90€</span> 4,90€/mês
               </a>
               <a href={(()=>{const u=new URL(STRIPE_LINK_30D);u.searchParams.set("client_reference_id",session.user.id);u.searchParams.set("prefilled_email",session.user.email);return u.toString();})()} style={{display:"block",background:"#fff",color:"#0f172a",border:"1px solid #e2e8f0",borderRadius:12,padding:"13px 20px",fontWeight:700,fontSize:15,textDecoration:"none",textAlign:"center"}}>
-                📅 Acesso 30 dias — <span style={{textDecoration:"line-through",opacity:0.5,fontSize:13}}>6,90€</span> 4,90€ · MB Way / Multibanco
+                📅 Acesso 30 dias — 6,90€ · MB Way / Multibanco
               </a>
             </div>
             <button onClick={()=>supabase.auth.signOut()} style={{background:"none",border:"none",color:"#94a3b8",fontSize:13,cursor:"pointer",fontFamily:"inherit",marginTop:8}}>
@@ -2395,6 +2412,7 @@ function ImoPro() {
                   <div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>⭐ RECOMENDADO</div>
                   <div style={{textAlign:"center",paddingBottom:14,borderBottom:`1px solid ${border}`,marginBottom:14}}>
                     <div style={{fontSize:14,fontWeight:700,color:text,marginBottom:6}}>Subscrição Mensal</div>
+                    <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,marginBottom:2}}>🏷 PREÇO PROMOCIONAL</div>
                     <div style={{fontSize:12,color:muted,textDecoration:"line-through",marginBottom:2}}>6,90€/mês</div>
                     <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:2}}>
                       <span style={{fontSize:28,fontWeight:800,color:teal}}>4,90€</span>
@@ -2411,9 +2429,8 @@ function ImoPro() {
                 <div style={{...CARD,borderRadius:16,border:`2px solid ${border}`}}>
                   <div style={{textAlign:"center",paddingBottom:14,borderBottom:`1px solid ${border}`,marginBottom:14}}>
                     <div style={{fontSize:14,fontWeight:700,color:text,marginBottom:6}}>Acesso 30 dias</div>
-                    <div style={{fontSize:12,color:muted,textDecoration:"line-through",marginBottom:2}}>6,90€</div>
                     <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:2}}>
-                      <span style={{fontSize:28,fontWeight:800,color:text}}>4,90€</span>
+                      <span style={{fontSize:28,fontWeight:800,color:text}}>6,90€</span>
                     </div>
                     <div style={{fontSize:11,color:muted,marginTop:4}}>MB Way · Multibanco · Cartão</div>
                   </div>
