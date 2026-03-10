@@ -427,9 +427,17 @@ function parseCSV(text) {
     } else if (nameI >= 0) {
       name = c[nameI] || "";
     }
-    const phone = (phoneI >= 0 ? c[phoneI] : (phoneGenI >= 0 ? c[phoneGenI] : "")) || "";
+    const rawPhone = (phoneI >= 0 ? c[phoneI] : (phoneGenI >= 0 ? c[phoneGenI] : "")) || "";
+    // Detect country code from number (e.g. "+351 914..." → code="+351", phone="914...")
+    const KNOWN_CODES = ["+244","+258","+238","+971","+974","+966","+212","+352","+351","+55","+44","+33","+49","+34","+39","+31","+32","+41","+46","+47","+45","+48","+7","+61","+86","+1"];
+    let phone_code = "+351", phone = rawPhone;
+    if(rawPhone.startsWith("+")) {
+      const matched = KNOWN_CODES.find(code => rawPhone.replace(/\s/g,"").startsWith(code));
+      if(matched) { phone_code = matched; phone = rawPhone.slice(matched.length).replace(/^\s+/,""); }
+      else { phone_code = "+351"; phone = rawPhone; }
+    }
     const email = emailI >= 0 ? (c[emailI] || "") : "";
-    return { id: Date.now()+Math.random(), name, phone, email, interests:[], typologies:[], districts:[], concelhos:[], freguesias:[], priceRange:"", status:"Frio", notes:"" };
+    return { id: Date.now()+Math.random(), name, phone, phone_code, email, interests:[], typologies:[], districts:[], concelhos:[], freguesias:[], priceRange:"", status:"Frio", notes:"" };
   }).filter(c => c.name || c.phone);
 }
 
@@ -762,12 +770,12 @@ function SendModal({property, contacts, session, onClose, isMobile, theme}) {
                 <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                   <span style={{fontSize:12,fontWeight:700,color:scC}}>{sc}%</span>
                   <Badge status={c.status}/>
-                  {sent
-                    ?<div style={{padding:"7px 12px",borderRadius:8,background:"#10b98118",border:"1px solid #10b98144",fontSize:12,color:"#10b981",fontWeight:600}}>✓ Enviado</div>
-                    :<button onClick={()=>sendOne(c)} style={{...BTNP,padding:"7px 12px",fontSize:12}}>
-                      <span className="material-icons-outlined" style={{fontSize:14}}>chat</span>Enviar
+                  <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end"}}>
+                    {sent&&<div style={{fontSize:10,color:"#10b981",fontWeight:600}}>✓ Enviado</div>}
+                    <button onClick={()=>sendOne(c)} style={{...BTNP,padding:"7px 12px",fontSize:12,background:sent?"#f1f5f9":undefined,color:sent?"#64748b":undefined,border:sent?"1px solid #e2e8f0":"none"}}>
+                      <span className="material-icons-outlined" style={{fontSize:14}}>{sent?"replay":"chat"}</span>{sent?"Reenviar":"Enviar"}
                     </button>
-                  }
+                  </div>
                 </div>
               </div>
             );
@@ -1229,7 +1237,7 @@ function LoginScreen({dark}) {
   );
 }
 
-const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"}];
+const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"},{id:"help",icon:"help_outline",label:"Ajuda"}];
 const PLAN_LIMITS={pending:{contacts:0,properties:0},trial:{contacts:0,properties:0},basic:{contacts:Infinity,properties:Infinity}};
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
 const STRIPE_PORTAL=process.env.REACT_APP_STRIPE_PORTAL||"https://billing.stripe.com/p/login/YOUR_PORTAL_LINK";
@@ -1502,23 +1510,26 @@ function PropertiesSelectionPage() {
       <style>{`*{box-sizing:border-box;margin:0;padding:0}a{text-decoration:none}.prop-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(17,45,78,0.12)!important;}`}</style>
 
       {/* Header */}
-      <nav style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 20px",display:"flex",alignItems:"center",height:68,gap:10,flexWrap:"wrap"}}>
-        <img src={LOGO_URL} alt="ImoMatch" style={{height:42,objectFit:"contain",flexShrink:0}}/>
-        <div style={{flex:1}}/>
+      <nav style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"10px 16px",display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <img src={LOGO_URL} alt="ImoMatch" style={{height:38,objectFit:"contain",flexShrink:0}}/>
+          <div style={{flex:1}}/>
+          {waLink&&<a href={waLink} target="_blank" rel="noreferrer"
+            style={{display:"inline-flex",alignItems:"center",gap:6,background:teal,color:"#fff",padding:"8px 14px",borderRadius:10,fontWeight:700,fontSize:13,flexShrink:0,textDecoration:"none"}}>
+            <span className="material-icons-outlined" style={{fontSize:16}}>chat</span>
+            <span style={{display:window.innerWidth<400?"none":"inline"}}>Contactar Agente</span>
+          </a>}
+        </div>
         <button onClick={()=>{
           const pageUrl = window.location.href;
           const msg = encodeURIComponent(`Olá! 👋 Preparei uma selecção de ${properties.length} imóve${properties.length===1?"l":"is"} especialmente para si:\n\n${pageUrl}\n\nEstou disponível para qualquer esclarecimento! 😊`);
           const phone = agent?.phone?.replace(/[^0-9]/g,"") || "";
           window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
         }}
-          style={{display:"inline-flex",alignItems:"center",gap:7,background:"#25d366",color:"#fff",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,flexShrink:0,border:"none",cursor:"pointer",boxShadow:"0 2px 8px #25d36630"}}>
-          <span className="material-icons-outlined" style={{fontSize:17}}>share</span>
-          Partilhar Selecção
+          style={{display:"flex",alignItems:"center",justifyContent:"center",gap:7,background:"#25d366",color:"#fff",padding:"10px 16px",borderRadius:10,fontWeight:700,fontSize:14,border:"none",cursor:"pointer",width:"100%",boxShadow:"0 2px 8px #25d36630"}}>
+          <span className="material-icons-outlined" style={{fontSize:18}}>share</span>
+          Partilhar esta Selecção via WhatsApp
         </button>
-        {waLink&&<a href={waLink} target="_blank" rel="noreferrer"
-          style={{display:"inline-flex",alignItems:"center",gap:6,background:teal,color:"#fff",padding:"9px 16px",borderRadius:10,fontWeight:700,fontSize:13,flexShrink:0}}>
-          <span className="material-icons-outlined" style={{fontSize:16}}>chat</span>Contactar Agente
-        </a>}
       </nav>
 
       {/* Hero */}
@@ -1936,7 +1947,7 @@ function ImoPro() {
   const confirmImport = async()=>{
     const existing = contacts.map(c=>c.phone).filter(Boolean);
     const newOnes = importPrev.filter(p=>!existing.includes(p.phone)).map(c=>({
-      user_id:session.user.id, name:c.name||"Sem nome", phone:c.phone||"",
+      user_id:session.user.id, name:c.name||"Sem nome", phone:c.phone||"", phone_code:c.phone_code||"+351",
       email:c.email||"", interests:[], typologies:[], districts:[], concelhos:[],
       freguesias:[], price_range:"", status:"Frio", notes:"",
     }));
@@ -1948,7 +1959,7 @@ function ImoPro() {
     setLoading(false);
   };
 
-  const PAGE_TITLE = {dashboard:"Início",contacts:"Contactos",properties:"Imóveis",matches:"Matches",campaigns:"Campanhas",social:"Redes Sociais",billing:"Plano & Subscrição"}[page];
+  const PAGE_TITLE = {dashboard:"Início",contacts:"Contactos",properties:"Imóveis",matches:"Matches",campaigns:"Campanhas",social:"Redes Sociais",billing:"Plano & Subscrição",help:"Ajuda & Suporte"}[page];
   const currentUser = profile ? {...profile, name: profile.name||session?.user?.email||"Utilizador"} : null;
 
   // ── Loading inicial ──
@@ -2403,6 +2414,78 @@ function ImoPro() {
 
                   </div>
                 ))}
+              </div>
+            </div>}
+
+            {/* AJUDA */}
+            {page==="help"&&<div>
+              {/* Download App */}
+              <div style={{...CARD,borderRadius:16,marginBottom:20,background:`${teal}08`,border:`1px solid ${teal}33`}}>
+                <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                  <div style={{fontSize:40}}>📱</div>
+                  <div style={{flex:1,minWidth:180}}>
+                    <div style={{fontSize:15,fontWeight:700,color:text,marginBottom:4}}>Instalar App Android</div>
+                    <div style={{fontSize:13,color:muted,lineHeight:1.5}}>Descarrega a app ImoMatch para o teu Android e usa-a como app nativa, sem browser.</div>
+                  </div>
+                  <a href="/imomatch.apk" download style={{background:teal,color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:7,flexShrink:0}}>
+                    <span className="material-icons-outlined" style={{fontSize:17}}>download</span>Download APK
+                  </a>
+                </div>
+              </div>
+
+              {/* Guias de utilização */}
+              <div style={{...CARD,borderRadius:16,marginBottom:20}}>
+                <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
+                  <span className="material-icons-outlined" style={{color:teal,fontSize:20}}>menu_book</span>Guia de Utilização
+                </h3>
+                {[
+                  {icon:"people",title:"Contactos",desc:"Adiciona contactos manualmente com nome, telefone, email e critérios de pesquisa (tipo de imóvel, tipologia, localização e budget). O código de país é seleccionável para clientes estrangeiros."},
+                  {icon:"apartment",title:"Imóveis",desc:"Regista os teus imóveis com fotos, preço, tipologia e localização. O sistema cria automaticamente uma landing page partilhável para cada imóvel."},
+                  {icon:"auto_awesome",title:"Matches",desc:"O sistema cruza automaticamente os critérios dos teus contactos com os imóveis disponíveis e sugere os melhores matches. Podes enviar o imóvel por WhatsApp directamente."},
+                  {icon:"bar_chart",title:"Campanhas",desc:"Cria campanhas para enviar um imóvel a vários contactos de uma vez. O sistema regista quem já recebeu e permite reenviar a qualquer altura."},
+                  {icon:"share",title:"Redes Sociais",desc:"Gera posts optimizados para partilhar os teus imóveis no Instagram, Facebook e LinkedIn com texto e hashtags prontos a usar."},
+                ].map(({icon,title,desc},i)=>(
+                  <div key={i} style={{display:"flex",gap:12,marginBottom:16,paddingBottom:16,borderBottom:i<4?`1px solid ${border}`:"none"}}>
+                    <span className="material-icons-outlined" style={{color:teal,fontSize:22,flexShrink:0,marginTop:1}}>{icon}</span>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:text,marginBottom:4}}>{title}</div>
+                      <div style={{fontSize:13,color:muted,lineHeight:1.6}}>{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Importar via Google Contacts */}
+              <div style={{...CARD,borderRadius:16,marginBottom:20}}>
+                <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
+                  <span className="material-icons-outlined" style={{color:"#4285F4",fontSize:20}}>contacts</span>Importar do Google Contacts
+                </h3>
+                {[
+                  {n:"1",t:"Abre o Google Contacts",d:"Vai a contacts.google.com no teu computador ou browser."},
+                  {n:"2",t:"Selecciona os contactos",d:"Selecciona todos ou apenas os que queres importar (usa as caixas de selecção)."},
+                  {n:"3",t:"Exportar como CSV",d:'Clica em "Exportar" no menu lateral → escolhe "Google CSV" → clica "Exportar".'},
+                  {n:"4",t:"Importar no ImoMatch",d:'Na página Contactos, clica no botão "Importar CSV" e selecciona o ficheiro descarregado. O sistema detecta automaticamente os nomes, telefones (incluindo código de país) e emails.'},
+                  {n:"5",t:"Rever e confirmar",d:"Vês uma pré-visualização dos contactos antes de confirmar a importação. Duplicados são ignorados automaticamente."},
+                ].map(({n,t,d},i)=>(
+                  <div key={i} style={{display:"flex",gap:12,marginBottom:i<4?14:0}}>
+                    <div style={{width:26,height:26,borderRadius:"50%",background:teal,color:"#fff",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:text,marginBottom:3}}>{t}</div>
+                      <div style={{fontSize:13,color:muted,lineHeight:1.6}}>{d}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Suporte */}
+              <div style={{...CARD,borderRadius:16,background:`${teal}08`,border:`1px solid ${teal}22`}}>
+                <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                  <span className="material-icons-outlined" style={{color:teal,fontSize:20}}>support_agent</span>Suporte
+                </h3>
+                <div style={{fontSize:13,color:muted,lineHeight:1.8}}>
+                  Tens alguma dúvida ou problema? Fala connosco:<br/>
+                  <a href="mailto:suporte@imomatch.pt" style={{color:teal,fontWeight:600}}>suporte@imomatch.pt</a>
+                </div>
               </div>
             </div>}
 
