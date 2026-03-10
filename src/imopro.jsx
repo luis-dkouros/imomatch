@@ -2172,22 +2172,32 @@ function ImoPro() {
 
             {/* BLOQUEIO — conta sem subscrição */}
             {isPending&&page!=="billing"&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-              <div style={{background:card,borderRadius:20,padding:isMobile?"24px 20px":36,maxWidth:440,width:"100%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.4)"}}>
-                <div style={{fontSize:48,marginBottom:12}}>🔒</div>
-                <div style={{fontSize:20,fontWeight:800,color:text,marginBottom:8}}>Subscrição necessária</div>
-                <div style={{fontSize:14,color:muted,lineHeight:1.6,marginBottom:24}}>
-                  A tua conta foi criada mas ainda não tem uma subscrição activa.<br/>
-                  Subscreve o plano Basic para aceder a todas as funcionalidades.
+              <div style={{background:card,borderRadius:20,padding:isMobile?"20px 16px":32,maxWidth:440,width:"100%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.4)"}}>
+                <div style={{fontSize:40,marginBottom:10}}>🔒</div>
+                <div style={{fontSize:18,fontWeight:800,color:text,marginBottom:6}}>Subscrição necessária</div>
+                <div style={{fontSize:13,color:muted,lineHeight:1.6,marginBottom:20}}>
+                  Escolhe o plano para aceder ao ImoMatch.
                 </div>
-                <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email)}
-                  style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:12,padding:"14px 20px",fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>
-                  ⭐ Subscrever Basic — 4,90€/mês
-                </button>
+                {/* Duas opções */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email)}
+                    style={{background:teal,color:"#fff",border:"none",borderRadius:12,padding:"12px 10px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",lineHeight:1.4}}>
+                    ⭐ Mensal<br/>
+                    <span style={{textDecoration:"line-through",opacity:0.7,fontSize:11}}>6,90€</span> <span style={{fontSize:15}}>4,90€</span><span style={{fontSize:11}}>/mês</span><br/>
+                    <span style={{fontSize:10,opacity:0.85}}>Cartão · Auto-renovação</span>
+                  </button>
+                  <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email,STRIPE_LINK_30D)}
+                    style={{background:inp,color:text,border:`1px solid ${border}`,borderRadius:12,padding:"12px 10px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",lineHeight:1.4}}>
+                    📅 30 dias<br/>
+                    <span style={{fontSize:15}}>6,90€</span><br/>
+                    <span style={{fontSize:10,color:muted}}>MB Way · Multibanco</span>
+                  </button>
+                </div>
                 <button onClick={()=>setPage("billing")}
-                  style={{width:"100%",background:"none",color:muted,border:`1px solid ${border}`,borderRadius:12,padding:"10px 20px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                  style={{width:"100%",background:"none",color:muted,border:`1px solid ${border}`,borderRadius:12,padding:"9px 20px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:10}}>
                   Ver detalhes do plano
                 </button>
-                <div style={{marginTop:16,fontSize:12,color:muted}}>
+                <div style={{fontSize:12,color:muted}}>
                   Já pagaste? <button onClick={loadProfile} style={{background:"none",border:"none",color:teal,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,padding:0}}>Clica aqui para verificar</button>
                 </div>
               </div>
