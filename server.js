@@ -226,6 +226,22 @@ app.get("/imovel/:id", async (req, res, next) => {
   }
 });
 
+// ── Facebook OAuth callback ───────────────────────────────────────────────
+// O Facebook redireciona para /auth/facebook/callback?code=...
+// Passamos o code para a SPA via query param fb_code
+app.get("/auth/facebook/callback", (req, res) => {
+  const code  = req.query.code;
+  const error = req.query.error;
+  if (error) {
+    return res.redirect(`/?fb_error=${encodeURIComponent(error)}`);
+  }
+  if (!code) {
+    return res.redirect("/?fb_error=no_code");
+  }
+  // Redireciona para a SPA com o código
+  res.redirect(`/?fb_code=${encodeURIComponent(code)}`);
+});
+
 // ── Ficheiros estáticos do React build ────────────────────────────────────
 app.use(express.static(BUILD_DIR));
 
