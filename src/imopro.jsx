@@ -1798,12 +1798,29 @@ function ImoPro() {
   },[]);
 
   // ── Facebook OAuth callback handler ──
+  // Passo 1: capturar o fb_code da URL assim que o componente monta e guardá-lo
   useEffect(()=>{
     const params = new URLSearchParams(window.location.search);
     const fbCode = params.get("fb_code");
-    if(fbCode && session?.user?.id) {
+    const fbError = params.get("fb_error");
+    if(fbCode) {
+      // Guardar em sessionStorage antes de limpar a URL
+      sessionStorage.setItem("pending_fb_code", fbCode);
       window.history.replaceState({},"",window.location.pathname);
-      handleFbCallback(fbCode);
+    }
+    if(fbError) {
+      showNotif("Erro ao ligar com o Facebook: " + fbError);
+      window.history.replaceState({},"",window.location.pathname);
+    }
+  },[]); // executa apenas uma vez no mount
+
+  // Passo 2: processar o código quando a sessão estiver disponível
+  useEffect(()=>{
+    if(!session?.user?.id) return;
+    const pendingCode = sessionStorage.getItem("pending_fb_code");
+    if(pendingCode) {
+      sessionStorage.removeItem("pending_fb_code");
+      handleFbCallback(pendingCode);
     }
   },[session]);
 
@@ -1825,7 +1842,7 @@ function ImoPro() {
   };
 
   const connectFacebook = ()=>{
-    const scope = "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,pages_show_list";
+    const scope = "pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish,business_management";
     const state = btoa(JSON.stringify({userId: session?.user?.id}));
     const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_REDIRECT)}&scope=${scope}&state=${state}&response_type=code`;
     window.location.href = url;
