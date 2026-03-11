@@ -2694,7 +2694,7 @@ function ImoPro() {
                   {properties.length===0
                     ? <div style={{textAlign:"center",padding:24,color:muted,fontSize:13}}>Sem imóveis para publicar.</div>
                     : properties.map(p=>{
-                        const photo = p.photos?.[0]||"";
+                        const photo = p.photos?.[0]?.url||"";
                         const alreadyPosted = p.fb_posted_at;
                         return(
                           <div key={p.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid ${border}`}}>
