@@ -1258,6 +1258,8 @@ const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",ico
 const PLAN_LIMITS={pending:{contacts:0,properties:0},trial:{contacts:0,properties:0},basic:{contacts:Infinity,properties:Infinity}};
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
 const STRIPE_LINK_30D=process.env.REACT_APP_STRIPE_LINK_30D||"https://buy.stripe.com/eVq14nbbK0K87Hv4dEcfK01";
+const META_APP_ID=process.env.REACT_APP_META_APP_ID||"1558755848548021";
+const META_REDIRECT=process.env.REACT_APP_META_REDIRECT||"https://www.imomatch.pt/auth/facebook/callback";
 const STRIPE_PORTAL=process.env.REACT_APP_STRIPE_PORTAL||"https://billing.stripe.com/p/login/YOUR_PORTAL_LINK";
 function openStripeCheckout(userId, email, link) {
   const base = link || STRIPE_LINK;
@@ -1725,6 +1727,12 @@ function ImoPro() {
   const [importPrev,setImportPrev]= useState([]);
   const [importErr, setImportErr] = useState("");
   const [showUpgrade, setShowUpgrade]  = useState(null); // {reason:'contacts'|'properties'|'feature', label:''}
+  const [fbConnected, setFbConnected]  = useState(false);
+  const [igConnected, setIgConnected]  = useState(false);
+  const [fbPageName,  setFbPageName]   = useState("");
+  const [igUsername,  setIgUsername]   = useState("");
+  const [socialPublishing, setSocialPublishing] = useState(null); // property being published
+  const [socialResult, setSocialResult] = useState(null); // {fb, ig, error}
   const [isMobile,  setIsMobile]  = useState(window.innerWidth<768);
   const [isTablet,  setIsTablet]  = useState(window.innerWidth<1024);
 
@@ -1789,9 +1797,68 @@ function ImoPro() {
     return () => window.removeEventListener('pwaInstallAvailable', handler);
   },[]);
 
+  // ── Facebook OAuth callback handler ──
+  useEffect(()=>{
+    const params = new URLSearchParams(window.location.search);
+    const fbCode = params.get("fb_code");
+    if(fbCode && session?.user?.id) {
+      window.history.replaceState({},"",window.location.pathname);
+      handleFbCallback(fbCode);
+    }
+  },[session]);
+
+  const handleFbCallback = async(code)=>{
+    showNotif("A ligar ao Facebook...");
+    try {
+      const res = await fetch(`${process.env.REACT_APP_SUPABASE_URL||"https://hsjzwucqoporsuzztrie.supabase.co"}/functions/v1/meta-social`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},
+        body: JSON.stringify({action:"exchange_token", code, userId: session.user.id})
+      });
+      const data = await res.json();
+      if(data.error) { showNotif("Erro ao ligar: "+data.error); return; }
+      setFbConnected(true); setFbPageName(data.pageName||"Página Facebook");
+      if(data.igUsername) { setIgConnected(true); setIgUsername(data.igUsername); }
+      showNotif("✅ Facebook" + (data.igUsername ? " e Instagram" : "") + " ligados!");
+      loadProfile();
+    } catch(e) { showNotif("Erro de ligação ao Facebook."); }
+  };
+
+  const connectFacebook = ()=>{
+    const scope = "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,pages_show_list";
+    const state = btoa(JSON.stringify({userId: session?.user?.id}));
+    const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_REDIRECT)}&scope=${scope}&state=${state}&response_type=code`;
+    window.location.href = url;
+  };
+
+  const disconnectSocial = async()=>{
+    await supabase.from("profiles").update({fb_page_id:null,fb_page_name:null,fb_access_token:null,ig_user_id:null,ig_username:null}).eq("id",session.user.id);
+    setFbConnected(false); setIgConnected(false); setFbPageName(""); setIgUsername("");
+    showNotif("Redes sociais desligadas.");
+  };
+
+  const publishToSocial = async(property)=>{
+    setSocialPublishing(property); setSocialResult(null);
+    try {
+      const res = await fetch(`${process.env.REACT_APP_SUPABASE_URL||"https://hsjzwucqoporsuzztrie.supabase.co"}/functions/v1/meta-social`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},
+        body: JSON.stringify({action:"publish", propertyId: property.id, userId: session.user.id})
+      });
+      const data = await res.json();
+      setSocialResult(data);
+      if(!data.error) {
+        showNotif("✅ Publicado nas redes sociais!");
+        loadProperties();
+      }
+    } catch(e) { setSocialResult({error:"Erro de ligação."}); }
+  };
+
   const loadProfile = async()=>{
     const {data} = await supabase.from("profiles").select("*").eq("id",session.user.id).single();
     setProfile(data);
+    if(data?.fb_page_id) { setFbConnected(true); setFbPageName(data.fb_page_name||"Página Facebook"); }
+    if(data?.ig_user_id) { setIgConnected(true); setIgUsername(data.ig_username||"Instagram"); }
   };
 
   const loadContacts = async()=>{
@@ -2558,26 +2625,111 @@ function ImoPro() {
                 <button onClick={()=>setShowUpgrade({reason:"feature",label:"Redes Sociais"})} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Ver Planos</button>
               </div>}
               <div style={{opacity:hasAccess?1:0.35,pointerEvents:hasAccess?"auto":"none"}}>
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:isMobile?12:16,marginBottom:20}}>
-                {[{name:"Facebook",color:"#1877f2",icon:"f",connected:false,desc:"Publicação automática na sua página"},{name:"Instagram",color:"#e1306c",icon:"◈",connected:false,desc:"Posts e Stories automáticos"},{name:"WhatsApp Business",color:"#25d366",icon:"◉",connected:true,desc:"Envio directo para contactos"},{name:"Portal Imobiliário",color:teal,icon:"⬡",connected:false,desc:"Idealista · Imovirtual"}].map((sn,i)=>(
-                  <div key={i} style={{...CARD,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-                    <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                      <div style={{width:42,height:42,borderRadius:9,background:`${sn.color}18`,border:`1px solid ${sn.color}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:sn.color,flexShrink:0}}>{sn.icon}</div>
-                      <div><div style={{fontWeight:600,fontSize:14,color:text}}>{sn.name}</div><div style={{fontSize:12,color:muted,marginTop:2}}>{sn.desc}</div></div>
+
+                {/* Conexão Facebook + Instagram */}
+                <div style={{...CARD,marginBottom:16}}>
+                  <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:16}}>Ligar Redes Sociais</h3>
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12}}>
+
+                    {/* Facebook */}
+                    <div style={{border:`1px solid ${fbConnected?"#1877f244":border}`,borderRadius:12,padding:16,background:fbConnected?"#1877f208":inp}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                        <div style={{width:40,height:40,borderRadius:9,background:"#1877f218",border:"1px solid #1877f233",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"#1877f2",fontWeight:900,flexShrink:0}}>f</div>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:14,color:text}}>Facebook</div>
+                          <div style={{fontSize:12,color:muted}}>{fbConnected ? fbPageName : "Não ligado"}</div>
+                        </div>
+                      </div>
+                      {fbConnected
+                        ? <div style={{display:"flex",gap:8}}>
+                            <div style={{flex:1,background:"#10b98111",border:"1px solid #10b98144",borderRadius:8,padding:"7px 10px",fontSize:12,fontWeight:600,color:"#10b981",textAlign:"center"}}>✓ Ligado</div>
+                            <button onClick={disconnectSocial} style={{background:inp,border:`1px solid ${border}`,borderRadius:8,padding:"7px 10px",fontSize:11,color:muted,cursor:"pointer",fontFamily:"inherit"}}>Desligar</button>
+                          </div>
+                        : <button onClick={connectFacebook} style={{width:"100%",background:"#1877f2",color:"#fff",border:"none",borderRadius:8,padding:"9px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                            Ligar com Facebook
+                          </button>
+                      }
                     </div>
-                    <button style={{padding:"7px 14px",borderRadius:8,border:`1px solid ${sn.connected?"#10b98144":border}`,background:sn.connected?"#10b98111":inp,color:sn.connected?"#10b981":muted,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit",flexShrink:0}}>{sn.connected?"✓ Ligado":"Ligar"}</button>
+
+                    {/* Instagram */}
+                    <div style={{border:`1px solid ${igConnected?"#e1306c44":border}`,borderRadius:12,padding:16,background:igConnected?"#e1306c08":inp}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                        <div style={{width:40,height:40,borderRadius:9,background:"#e1306c18",border:"1px solid #e1306c33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📷</div>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:14,color:text}}>Instagram</div>
+                          <div style={{fontSize:12,color:muted}}>{igConnected ? "@"+igUsername : fbConnected ? "Nenhuma conta Business ligada à página" : "Liga o Facebook primeiro"}</div>
+                        </div>
+                      </div>
+                      <div style={{background:igConnected?"#10b98111":`${border}44`,border:`1px solid ${igConnected?"#10b98144":border}`,borderRadius:8,padding:"7px 10px",fontSize:12,fontWeight:600,color:igConnected?"#10b981":muted,textAlign:"center"}}>
+                        {igConnected ? "✓ Ligado automaticamente" : "Liga via Facebook acima"}
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
-              <div style={CARD}>
-                <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:6}}>Agendamento de Publicações</h3>
-                <p style={{fontSize:13,color:muted,marginBottom:18}}>Ligue as suas contas para activar o agendamento automático.</p>
-                <div style={{border:`2px dashed ${border}`,borderRadius:12,padding:32,textAlign:"center"}}>
-                  <span className="material-icons-outlined" style={{fontSize:36,color:muted,display:"block",marginBottom:10}}>schedule_send</span>
-                  <div style={{fontSize:14,color:muted}}>Ligue pelo menos uma rede social para começar</div>
+                  {!fbConnected&&<div style={{marginTop:12,fontSize:12,color:muted,textAlign:"center"}}>
+                    💡 O Instagram é ligado automaticamente quando liga o Facebook (requer conta Instagram Business)
+                  </div>}
                 </div>
+
+                {/* Lista de imóveis para publicar */}
+                {fbConnected&&<div style={CARD}>
+                  <h3 style={{fontSize:15,fontWeight:700,color:text,marginBottom:4}}>Publicar Imóveis</h3>
+                  <p style={{fontSize:13,color:muted,marginBottom:16}}>Selecciona um imóvel para publicar no Facebook{igConnected?" e Instagram":""}.</p>
+                  {properties.length===0
+                    ? <div style={{textAlign:"center",padding:24,color:muted,fontSize:13}}>Sem imóveis para publicar.</div>
+                    : properties.map(p=>{
+                        const photo = p.photos?.[0]||"";
+                        const alreadyPosted = p.fb_posted_at;
+                        return(
+                          <div key={p.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid ${border}`}}>
+                            {photo
+                              ? <img src={photo} alt="" style={{width:52,height:52,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
+                              : <div style={{width:52,height:52,borderRadius:8,background:`${teal}18`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span className="material-icons-outlined" style={{color:teal,fontSize:22}}>apartment</span></div>
+                            }
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:14,fontWeight:600,color:text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.title}</div>
+                              <div style={{fontSize:12,color:muted}}>{p.concelho||"—"} · {p.price?.toLocaleString("pt-PT")}€</div>
+                              {alreadyPosted&&<div style={{fontSize:11,color:"#10b981",marginTop:2}}>✓ Publicado {new Date(alreadyPosted).toLocaleDateString("pt-PT")}</div>}
+                            </div>
+                            <button onClick={()=>publishToSocial(p)} disabled={socialPublishing?.id===p.id}
+                              style={{...BTNP,padding:"7px 12px",fontSize:12,flexShrink:0,opacity:socialPublishing?.id===p.id?0.7:1}}>
+                              {socialPublishing?.id===p.id ? "A publicar..." : alreadyPosted ? "Republicar" : "Publicar"}
+                            </button>
+                          </div>
+                        );
+                      })
+                  }
+                </div>}
+
+                {/* Placeholder se não ligado */}
+                {!fbConnected&&<div style={CARD}>
+                  <div style={{border:`2px dashed ${border}`,borderRadius:12,padding:32,textAlign:"center"}}>
+                    <span className="material-icons-outlined" style={{fontSize:36,color:muted,display:"block",marginBottom:10}}>share</span>
+                    <div style={{fontSize:14,color:muted,marginBottom:8}}>Liga o Facebook para começar a publicar imóveis</div>
+                    <button onClick={connectFacebook} style={{background:"#1877f2",color:"#fff",border:"none",borderRadius:8,padding:"10px 20px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                      Ligar com Facebook
+                    </button>
+                  </div>
+                </div>}
+
               </div>
-              </div>
+
+              {/* Modal resultado publicação */}
+              {socialResult&&<div style={{position:"fixed",inset:0,zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.6)"}} onClick={()=>{setSocialResult(null);setSocialPublishing(null);}}>
+                <div style={{background:card,borderRadius:20,padding:28,maxWidth:380,width:"92%",textAlign:"center"}} onClick={e=>e.stopPropagation()}>
+                  {socialResult.error
+                    ? <><div style={{fontSize:36,marginBottom:10}}>❌</div>
+                        <div style={{fontSize:16,fontWeight:700,color:text,marginBottom:8}}>Erro ao publicar</div>
+                        <div style={{fontSize:13,color:muted,marginBottom:16}}>{socialResult.error}</div></>
+                    : <><div style={{fontSize:36,marginBottom:10}}>✅</div>
+                        <div style={{fontSize:16,fontWeight:700,color:text,marginBottom:12}}>Publicado com sucesso!</div>
+                        {socialResult.fbPostId&&<div style={{fontSize:13,color:muted,marginBottom:4}}>📘 Facebook: <a href={`https://facebook.com/${socialResult.fbPostId}`} target="_blank" rel="noreferrer" style={{color:"#1877f2"}}>Ver post</a></div>}
+                        {socialResult.igPostId&&<div style={{fontSize:13,color:muted,marginBottom:4}}>📷 Instagram: publicado</div>}
+                      </>
+                  }
+                  <button onClick={()=>{setSocialResult(null);setSocialPublishing(null);}} style={{...BTNP,marginTop:8}}>Fechar</button>
+                </div>
+              </div>}
+
             </div>}
 
           </main>
