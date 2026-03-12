@@ -1248,7 +1248,80 @@ function LoginScreen({dark}) {
           )}
         </div>
 
-        <p style={{textAlign:"center",fontSize:12,color:muted,marginTop:16}}>ImoMatch © {new Date().getFullYear()}</p>
+        {/* ── SECÇÃO AGÊNCIAS ── */}
+        <div style={{marginTop:32}}>
+          <div style={{textAlign:"center",marginBottom:20}}>
+            <div style={{fontSize:13,fontWeight:700,color:teal,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>🏢 Planos para Agências</div>
+            <div style={{fontSize:14,color:muted}}>Gere toda a tua equipa numa única plataforma</div>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            {/* Basic */}
+            <div style={{background:card,border:`1px solid ${border}`,borderRadius:16,padding:20,textAlign:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+              <div style={{fontSize:28,marginBottom:6}}>🏢</div>
+              <div style={{fontSize:13,fontWeight:800,color:text,marginBottom:4}}>Basic</div>
+              <div style={{fontSize:22,fontWeight:800,color:teal,marginBottom:2}}>
+                {process.env.REACT_APP_STRIPE_AGENCY_10?"—":"Em breve"}
+              </div>
+              <div style={{fontSize:11,color:muted,marginBottom:10}}>até 10 agentes</div>
+              {[
+                "Página pública da agência",
+                "Tema e cores personalizadas",
+                "Gestão da equipa",
+                "Portal de billing",
+              ].map((f,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:muted,marginBottom:4,textAlign:"left"}}>
+                  <span style={{color:"#10b981",fontWeight:700,flexShrink:0}}>✓</span>{f}
+                </div>
+              ))}
+              {process.env.REACT_APP_STRIPE_AGENCY_10
+                ?<a href={process.env.REACT_APP_STRIPE_AGENCY_10} target="_blank" rel="noreferrer"
+                    style={{display:"block",marginTop:12,background:teal,color:"#fff",borderRadius:8,padding:"9px",fontWeight:700,fontSize:13,textDecoration:"none"}}>
+                    Subscrever
+                  </a>
+                :<div style={{marginTop:12,background:`${teal}15`,color:teal,borderRadius:8,padding:"9px",fontWeight:700,fontSize:12}}>
+                  Em breve
+                </div>
+              }
+            </div>
+
+            {/* Pro */}
+            <div style={{background:card,border:`2px solid ${teal}`,borderRadius:16,padding:20,textAlign:"center",boxShadow:"0 4px 20px rgba(59,178,161,0.15)",position:"relative"}}>
+              <div style={{position:"absolute",top:-11,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",fontSize:10,fontWeight:700,borderRadius:99,padding:"3px 12px",whiteSpace:"nowrap"}}>MAIS POPULAR</div>
+              <div style={{fontSize:28,marginBottom:6}}>🏆</div>
+              <div style={{fontSize:13,fontWeight:800,color:text,marginBottom:4}}>Pro</div>
+              <div style={{fontSize:22,fontWeight:800,color:teal,marginBottom:2}}>
+                {process.env.REACT_APP_STRIPE_AGENCY_20?"—":"Em breve"}
+              </div>
+              <div style={{fontSize:11,color:muted,marginBottom:10}}>até 20 agentes</div>
+              {[
+                "Tudo do Basic",
+                "Até 20 agentes",
+                "Prioridade no suporte",
+                "Futuras funcionalidades Pro",
+              ].map((f,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:muted,marginBottom:4,textAlign:"left"}}>
+                  <span style={{color:"#10b981",fontWeight:700,flexShrink:0}}>✓</span>{f}
+                </div>
+              ))}
+              {process.env.REACT_APP_STRIPE_AGENCY_20
+                ?<a href={process.env.REACT_APP_STRIPE_AGENCY_20} target="_blank" rel="noreferrer"
+                    style={{display:"block",marginTop:12,background:teal,color:"#fff",borderRadius:8,padding:"9px",fontWeight:700,fontSize:13,textDecoration:"none"}}>
+                    Subscrever
+                  </a>
+                :<div style={{marginTop:12,background:`${teal}15`,color:teal,borderRadius:8,padding:"9px",fontWeight:700,fontSize:12}}>
+                  Em breve
+                </div>
+              }
+            </div>
+          </div>
+
+          <div style={{textAlign:"center",fontSize:12,color:muted}}>
+            Para criar uma agência, subscreve um plano e o owner adiciona os agentes no painel.
+          </div>
+        </div>
+
+        <p style={{textAlign:"center",fontSize:12,color:muted,marginTop:24}}>ImoMatch © {new Date().getFullYear()}</p>
       </div>
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>

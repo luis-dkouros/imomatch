@@ -55,7 +55,7 @@ export default function AgencyPanel({ supabase, session, profile, dark, onNotif 
   const [tab, setTab]           = useState("overview");
   const [agency, setAgency]     = useState(null);
   const [members, setMembers]   = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading]   = useState(false);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState("");
 
@@ -91,7 +91,7 @@ export default function AgencyPanel({ supabase, session, profile, dark, onNotif 
 
   // ── Carregar agência ─────────────────────────────────────────────────────
   const loadAgency = useCallback(async () => {
-    if (!profile?.agency_id || !jwt) return;
+    if (!profile?.agency_id || !jwt) { setLoading(false); return; }
     setLoading(true);
     try {
       const [ag, mem] = await Promise.all([
