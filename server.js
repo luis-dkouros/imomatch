@@ -390,6 +390,36 @@ app.get("/api/agencies/:slug/properties", async (req, res) => {
 
 app.use(express.json());
 
+// Helper: executar SQL directo (bypassa RLS)
+function supabaseSQL(sql) {
+  return new Promise((resolve, reject) => {
+    const key  = SUPABASE_SERVICE_KEY;
+    const data = JSON.stringify({ query: sql });
+    const urlObj = new URL(SUPABASE_URL + "/rest/v1/rpc/exec_sql");
+    // Usar endpoint de query directo
+    const pgUrl = new URL(SUPABASE_URL.replace("https://", "https://") + "/rest/v1/");
+    const options = {
+      hostname: new URL(SUPABASE_URL).hostname,
+      path:     "/rest/v1/rpc/exec_sql",
+      method:   "POST",
+      headers: {
+        apikey:         key,
+        Authorization:  `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(data),
+      },
+    };
+    const req = https.request(options, res => {
+      let buf = "";
+      res.on("data", c => (buf += c));
+      res.on("end", () => resolve({ status: res.statusCode, body: buf }));
+    });
+    req.on("error", reject);
+    req.write(data);
+    req.end();
+  });
+}
+
 // Helper: fetch via https nativo (POST/PATCH com body)
 function supabaseRequest({ method, path, body, useServiceKey, extraHeaders }) {
   return new Promise((resolve, reject) => {
@@ -460,13 +490,27 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         return res.status(409).json({ error: "Este utilizador já pertence a outra agência." });
       }
 
-      // Actualizar perfil com dados da agência
-      await supabaseRequest({
+      // Actualizar perfil com dados da agência (forçar via PATCH com service key)
+      const patchRes = await supabaseRequest({
         method: "PATCH",
         path:   `/rest/v1/profiles?id=eq.${userId}`,
         body:   { agency_id, agency_role: "agent", plan: "agency" },
         useServiceKey: true,
+        extraHeaders:  { Prefer: "return=representation" },
       });
+      console.log(`[INVITE] PATCH perfil response:`, patchRes.status, JSON.stringify(patchRes.body));
+
+      // Verificar se actualizou — se não, tentar INSERT com upsert
+      if (!patchRes.body || (Array.isArray(patchRes.body) && patchRes.body.length === 0)) {
+        console.log(`[INVITE] PATCH não actualizou — a tentar upsert`);
+        await supabaseRequest({
+          method: "POST",
+          path:   "/rest/v1/profiles",
+          body:   { id: userId, name: email.split("@")[0], agency_id, agency_role: "agent", plan: "agency" },
+          useServiceKey: true,
+          extraHeaders:  { Prefer: "return=representation,resolution=merge-duplicates" },
+        });
+      }
 
       console.log(`[INVITE] Utilizador existente ${email} vinculado à agência ${agency_id}`);
 
