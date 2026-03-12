@@ -1779,8 +1779,8 @@ export default function App() {
 }
 
 // ─── THEME HELPER ─────────────────────────────────────────────────────────────
-function mkStyles(dark, isMobile) {
-  const teal   = "#3BB2A1";
+function mkStyles(dark, isMobile, agencyColor) {
+  const teal   = agencyColor || "#3BB2A1";
   const navy   = dark ? "#0f172a" : "#112D4E";
   const bg     = dark ? "#0f172a" : "#f1f5f9";
   const sidebar= dark ? "#1e293b" : "#ffffff";
@@ -1810,6 +1810,7 @@ const EMPTY_P = {title:"",type:"",typology:"",district:"",concelho:"",freguesia:
 function ImoPro() {
   const [session,   setSession]   = useState(undefined); // undefined=loading, null=logged out
   const [profile,   setProfile]   = useState(null);
+  const [agencyTheme, setAgencyTheme] = useState(null); // cores/dados da agência do agente
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedProps, setSelectedProps] = useState([]);
   const [selectedContacts, setSelectedContacts] = useState([]);
@@ -1996,6 +1997,11 @@ function ImoPro() {
     setProfile(data);
     if(data?.fb_page_id) { setFbConnected(true); setFbPageName(data.fb_page_name||"Página Facebook"); }
     if(data?.ig_user_id) { setIgConnected(true); setIgUsername(data.ig_username||"Instagram"); }
+    // Se é agente de agência, carregar tema da agência
+    if(data?.agency_id){
+      const {data:ag} = await supabase.from("agencies").select("id,name,slug,logo_url,primary_color,secondary_color,plan,max_users").eq("id",data.agency_id).single();
+      if(ag) setAgencyTheme(ag);
+    }
   };
 
   const loadContacts = async()=>{
@@ -2009,7 +2015,9 @@ function ImoPro() {
   };
 
   // ── Theme ──
-  const S = mkStyles(dark, isMobile);
+  // Cor primária da agência (se o utilizador for agente de agência)
+  const agencyColor = profile?.agency_id ? agencyTheme?.primary_color : null;
+  const S = mkStyles(dark, isMobile, agencyColor);
   const {teal,bg,sidebar,card,border,text,muted,inp,inpB,hover,thead,navy,BTNP,CARD:mkCARD,INP:mkINP,TH:mkTH,TD:mkTD} = S;
   const BTNS = S.BTNS(inp,border,muted);
   const CARD = mkCARD(card,border);

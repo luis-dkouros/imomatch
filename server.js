@@ -391,7 +391,7 @@ app.get("/api/agencies/:slug/properties", async (req, res) => {
 app.use(express.json());
 
 // Helper: fetch via https nativo (POST/PATCH com body)
-function supabaseRequest({ method, path, body, useServiceKey }) {
+function supabaseRequest({ method, path, body, useServiceKey, extraHeaders }) {
   return new Promise((resolve, reject) => {
     const key  = useServiceKey ? SUPABASE_SERVICE_KEY : SUPABASE_ANON_KEY;
     const urlObj = new URL(SUPABASE_URL + path);
@@ -406,6 +406,7 @@ function supabaseRequest({ method, path, body, useServiceKey }) {
         "Content-Type": "application/json",
         Accept:         "application/json",
         Prefer:         "return=representation",
+        ...(extraHeaders || {}),
         ...(data ? { "Content-Length": Buffer.byteLength(data) } : {}),
       },
     };
@@ -470,7 +471,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
 
     const userId = inviteRes.body?.id;
 
-    // Criar ou actualizar perfil ligado à agência
+    // Criar ou actualizar perfil ligado à agência (upsert via Prefer: resolution=merge-duplicates)
     await supabaseRequest({
       method: "POST",
       path:   "/rest/v1/profiles",
@@ -482,15 +483,8 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         plan:        "agency",
       },
       useServiceKey: true,
-    }).catch(() =>
-      // Se já existe, actualizar
-      supabaseRequest({
-        method: "PATCH",
-        path:   `/rest/v1/profiles?id=eq.${userId}`,
-        body:   { agency_id, agency_role: "agent", plan: "agency" },
-        useServiceKey: true,
-      })
-    );
+      extraHeaders: { Prefer: "return=representation,resolution=merge-duplicates" },
+    });
 
     // Limpar convite pendente se existia
     await supabaseRequest({
@@ -498,6 +492,71 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       path:   `/rest/v1/agency_invites?agency_id=eq.${agency_id}&email=eq.${encodeURIComponent(email)}`,
       useServiceKey: true,
     }).catch(() => {});
+
+    // Buscar nome da agência para personalizar email
+    const agRes = await supabaseRequest({
+      method: "GET",
+      path:   `/rest/v1/agencies?id=eq.${agency_id}&select=name,logo_url,primary_color`,
+      useServiceKey: true,
+    });
+    const ag = agRes.body?.[0] || {};
+    const agencyName  = ag.name  || "a tua agência";
+    const agencyColor = ag.primary_color || "#3BB2A1";
+
+    // Enviar email personalizado via Resend (substitui o email genérico do Supabase)
+    if (process.env.RESEND_API_KEY) {
+      // Gerar magic link para entrada directa
+      const linkRes = await supabaseRequest({
+        method: "POST",
+        path:   "/auth/v1/admin/generate_link",
+        body: {
+          type:  "invite",
+          email,
+          options: { redirect_to: `${SITE_URL}/?welcome=agency` },
+        },
+        useServiceKey: true,
+      });
+      const actionLink = linkRes.body?.properties?.action_link || `${SITE_URL}`;
+
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+          "Content-Type":  "application/json",
+        },
+        body: JSON.stringify({
+          from:    `ImoMatch <suporte@imomatch.pt>`,
+          to:      [email],
+          subject: `Foste convidado para a agência ${agencyName} no ImoMatch`,
+          html: `<!DOCTYPE html>
+<html lang="pt"><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:sans-serif">
+  <div style="max-width:520px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+    <div style="background:${agencyColor};padding:32px 32px 24px">
+      ${ag.logo_url ? `<img src="${ag.logo_url}" height="48" style="margin-bottom:16px;border-radius:8px;background:#fff;padding:4px"/>` : ""}
+      <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:800">${agencyName}</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px">Convite para a equipa</p>
+    </div>
+    <div style="padding:32px">
+      <h2 style="color:#0f172a;margin:0 0 12px;font-size:18px">Foste adicionado à equipa! 🎉</h2>
+      <p style="color:#64748b;line-height:1.6;margin:0 0 24px">
+        Foste convidado para fazer parte da agência <strong style="color:#0f172a">${agencyName}</strong> no ImoMatch.
+        O teu acesso está activo — não precisas de pagar nenhuma subscrição individual.
+      </p>
+      <a href="${actionLink}"
+        style="display:inline-block;background:${agencyColor};color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px">
+        Entrar no ImoMatch →
+      </a>
+      <p style="color:#94a3b8;font-size:12px;margin-top:32px;line-height:1.5">
+        Se não reconheces este convite, podes ignorar este email.<br/>
+        O link expira em 24 horas.
+      </p>
+    </div>
+  </div>
+</body></html>`,
+        }),
+      }).catch(e => console.error("[INVITE] Erro Resend:", e.message));
+    }
 
     console.log(`[INVITE] ${email} convidado para agência ${agency_id}`);
     return res.json({ success: true, userId, message: `Convite enviado para ${email}.` });
