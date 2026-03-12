@@ -1866,6 +1866,20 @@ function ImoPro() {
     loadProperties();
   },[session]);
 
+  // ── Handle convite de agência (?welcome=agency) ──
+  // O agente chegou via link de convite — já está autenticado e ligado à agência
+  useEffect(()=>{
+    const params = new URLSearchParams(window.location.search);
+    if(params.get("welcome")==="agency" && session){
+      window.history.replaceState({},"",window.location.pathname);
+      // Recarregar perfil para obter plan="agency" e agency_id actualizados
+      loadProfile();
+      setPage("dashboard");
+      setNotif("🎉 Bem-vindo à tua agência! O teu acesso está activo.");
+      setTimeout(()=>setNotif(null),6000);
+    }
+  },[session]);
+
   // ── Handle Stripe return (?payment=success) ──
   useEffect(()=>{
     const params = new URLSearchParams(window.location.search);
