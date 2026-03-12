@@ -477,26 +477,21 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
     });
 
   } else {
-    // 3. Criar conta nova com senha temporária
-    const tempPassword = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6).toUpperCase() + "!";
-
-    const createRes = await supabaseRequest({
+    // 3. Usar o endpoint invite — cria conta E envia email de convite automaticamente
+    // O agente recebe email com link para definir a sua senha
+    const inviteRes = await supabaseRequest({
       method: "POST",
-      path:   "/auth/v1/admin/users",
-      body: {
-        email,
-        password:      tempPassword,
-        email_confirm: true,  // confirmar email automaticamente
-      },
+      path:   `/auth/v1/invite?redirect_to=${encodeURIComponent(SITE_URL + "/?setup=1")}`,
+      body:   { email },
       useServiceKey: true,
     });
 
-    if (createRes.status !== 200 && createRes.status !== 201) {
-      console.error("[INVITE] Erro ao criar utilizador:", createRes.body);
-      return res.status(500).json({ error: "Erro ao criar conta: " + (createRes.body?.message || "erro desconhecido") });
+    if (inviteRes.status !== 200 && inviteRes.status !== 201) {
+      console.error("[INVITE] Erro ao convidar utilizador:", inviteRes.body);
+      return res.status(500).json({ error: "Erro ao enviar convite: " + (inviteRes.body?.message || inviteRes.body?.msg || "erro desconhecido") });
     }
 
-    userId = createRes.body?.id;
+    userId = inviteRes.body?.id;
 
     // 4. Criar perfil ligado à agência
     await supabaseRequest({
@@ -504,24 +499,10 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       path:   "/rest/v1/profiles",
       body: {
         id:          userId,
-        name:        email.split("@")[0], // nome provisório
+        name:        email.split("@")[0],
         agency_id,
         agency_role: "agent",
         plan:        "agency",
-      },
-      useServiceKey: true,
-    });
-
-    // 5. Enviar email de redefinição de senha (o Supabase envia o link)
-    await supabaseRequest({
-      method: "POST",
-      path:   "/auth/v1/admin/generate_link",
-      body: {
-        type:       "recovery",
-        email,
-        options: {
-          redirect_to: `${SITE_URL}/?setup=1`,
-        },
       },
       useServiceKey: true,
     });
