@@ -424,76 +424,53 @@ function supabaseRequest({ method, path, body, useServiceKey }) {
 }
 
 app.post("/api/agencies/invite-agent", async (req, res) => {
-  const { agency_id, email, invited_by_jwt } = req.body || {};
+  const { agency_id, email } = req.body || {};
 
   if (!agency_id || !email) {
     return res.status(400).json({ error: "agency_id e email são obrigatórios." });
   }
   if (!SUPABASE_SERVICE_KEY) {
-    return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada no servidor." });
+    return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada." });
   }
 
-  // 1. Verificar que quem convida tem permissão (owner ou admin da agência)
-  // Valida o JWT do utilizador que fez o pedido
-  const authRes = await supabaseRequest({
-    method: "GET",
-    path:   `/rest/v1/profiles?agency_id=eq.${encodeURIComponent(agency_id)}&agency_role=in.(owner,admin)&select=id`,
-    useServiceKey: false,
-  }).catch(() => null);
-
-  // Validação simples: se não conseguimos verificar, avançamos (o RLS do Supabase protege)
-  // Para maior segurança podes validar o JWT aqui
-
-  // 2. Verificar se o email já tem conta
-  const existingUser = await supabaseRequest({
-    method: "GET",
-    path:   `/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
-    useServiceKey: true,
-  }).catch(() => ({ body: null }));
-
-  let userId = null;
-
-  if (existingUser.body?.users?.length > 0) {
-    // Utilizador já existe
-    userId = existingUser.body.users[0].id;
-
-    // Verificar se já está noutra agência
-    const profileRes = await supabaseRequest({
+  try {
+    // Verificar se já está noutra agência (se já tem conta)
+    const existingRes = await supabaseRequest({
       method: "GET",
-      path:   `/rest/v1/profiles?id=eq.${userId}&select=agency_id`,
+      path:   `/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
       useServiceKey: true,
     });
-    const profile = profileRes.body?.[0];
-    if (profile?.agency_id && profile.agency_id !== agency_id) {
-      return res.status(409).json({ error: "Este utilizador já pertence a outra agência." });
+    const existingUser = existingRes.body?.users?.[0] || null;
+
+    if (existingUser) {
+      const profileRes = await supabaseRequest({
+        method: "GET",
+        path:   `/rest/v1/profiles?id=eq.${existingUser.id}&select=agency_id`,
+        useServiceKey: true,
+      });
+      const p = profileRes.body?.[0];
+      if (p?.agency_id && p.agency_id !== agency_id) {
+        return res.status(409).json({ error: "Este utilizador já pertence a outra agência." });
+      }
     }
 
-    // Ligar à agência
-    await supabaseRequest({
-      method: "PATCH",
-      path:   `/rest/v1/profiles?id=eq.${userId}`,
-      body:   { agency_id, agency_role: "agent", plan: "agency" },
-      useServiceKey: true,
-    });
-
-  } else {
-    // 3. Usar o endpoint invite — cria conta E envia email de convite automaticamente
-    // O agente recebe email com link para definir a sua senha
+    // Usar SEMPRE o /invite — se o utilizador não existe cria e envia email.
+    // Se já existe, o Supabase reenvía o email de convite sem criar duplicado.
     const inviteRes = await supabaseRequest({
       method: "POST",
-      path:   `/auth/v1/invite?redirect_to=${encodeURIComponent(SITE_URL + "/?setup=1")}`,
+      path:   `/auth/v1/invite?redirect_to=${encodeURIComponent(SITE_URL + "/?welcome=agency")}`,
       body:   { email },
       useServiceKey: true,
     });
 
     if (inviteRes.status !== 200 && inviteRes.status !== 201) {
-      console.error("[INVITE] Erro ao convidar utilizador:", inviteRes.body);
+      console.error("[INVITE] Erro:", JSON.stringify(inviteRes.body));
       return res.status(500).json({ error: "Erro ao enviar convite: " + (inviteRes.body?.message || inviteRes.body?.msg || "erro desconhecido") });
     }
 
-    userId = inviteRes.body?.id;
+    const userId = inviteRes.body?.id;
 
-    // 4. Criar perfil ligado à agência
+    // Criar ou actualizar perfil ligado à agência
     await supabaseRequest({
       method: "POST",
       path:   "/rest/v1/profiles",
@@ -505,19 +482,32 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         plan:        "agency",
       },
       useServiceKey: true,
-    });
+    }).catch(() =>
+      // Se já existe, actualizar
+      supabaseRequest({
+        method: "PATCH",
+        path:   `/rest/v1/profiles?id=eq.${userId}`,
+        body:   { agency_id, agency_role: "agent", plan: "agency" },
+        useServiceKey: true,
+      })
+    );
+
+    // Limpar convite pendente se existia
+    await supabaseRequest({
+      method: "DELETE",
+      path:   `/rest/v1/agency_invites?agency_id=eq.${agency_id}&email=eq.${encodeURIComponent(email)}`,
+      useServiceKey: true,
+    }).catch(() => {});
+
+    console.log(`[INVITE] ${email} convidado para agência ${agency_id}`);
+    return res.json({ success: true, userId, message: `Convite enviado para ${email}.` });
+
+  } catch (e) {
+    console.error("[INVITE] Erro inesperado:", e.message);
+    return res.status(500).json({ error: "Erro interno: " + e.message });
   }
-
-  // 6. Remover convite pendente se existia
-  await supabaseRequest({
-    method: "DELETE",
-    path:   `/rest/v1/agency_invites?agency_id=eq.${agency_id}&email=eq.${encodeURIComponent(email)}`,
-    useServiceKey: true,
-  }).catch(() => {});
-
-  console.log(`[INVITE] Agente ${email} adicionado à agência ${agency_id}`);
-  return res.json({ success: true, userId, message: `Conta criada e email enviado para ${email}.` });
 });
+
 
 app.use(express.static(BUILD_DIR));
 
