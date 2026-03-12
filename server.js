@@ -243,6 +243,142 @@ app.get("/auth/facebook/callback", (req, res) => {
 });
 
 // ── Ficheiros estáticos do React build ────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PATCH para server.js — Módulo de Agências (Fase 2)
+// Adicionar ANTES da linha: app.use(express.static(BUILD_DIR))
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Buscar agência pelo slug no Supabase ───────────────────────────────────
+function fetchAgencyBySlug(slug) {
+  return new Promise((resolve, reject) => {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      return reject(new Error("Supabase env vars missing"));
+    }
+
+    const url =
+      `${SUPABASE_URL}/rest/v1/agencies` +
+      `?slug=eq.${encodeURIComponent(slug)}` +
+      `&select=id,slug,name,logo_url,primary_color,secondary_color,plan` +
+      `&limit=1`;
+
+    const options = {
+      headers: {
+        apikey:        SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Accept:        "application/json",
+      },
+    };
+
+    https.get(url, options, res => {
+      let data = "";
+      res.on("data", chunk => (data += chunk));
+      res.on("end", () => {
+        try {
+          const rows = JSON.parse(data);
+          resolve(Array.isArray(rows) && rows.length ? rows[0] : null);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on("error", reject);
+  });
+}
+
+// ── API: GET /api/agencies/:slug ────────────────────────────────────────────
+// Devolve os dados públicos da agência para o frontend aplicar o tema.
+app.get("/api/agencies/:slug", async (req, res) => {
+  const { slug } = req.params;
+
+  // Slug só pode conter letras, números e hífens
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ error: "Slug inválido" });
+  }
+
+  try {
+    const agency = await fetchAgencyBySlug(slug);
+
+    if (!agency) {
+      return res.status(404).json({ error: "Agência não encontrada" });
+    }
+
+    // Cache de 5 minutos (CDN / browser)
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    return res.json(agency);
+
+  } catch (err) {
+    console.error("[AGENCY] Erro ao buscar agência:", err.message);
+    return res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+// ── API: GET /api/agencies/:slug/properties ─────────────────────────────────
+// Imóveis públicos da agência (para a página pública /[slug])
+app.get("/api/agencies/:slug/properties", async (req, res) => {
+  const { slug } = req.params;
+  const page  = Math.max(1, parseInt(req.query.page  || "1",  10));
+  const limit = Math.min(50, parseInt(req.query.limit || "12", 10));
+  const offset = (page - 1) * limit;
+
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return res.status(400).json({ error: "Slug inválido" });
+  }
+
+  try {
+    // 1. Resolver agency_id a partir do slug
+    const agency = await fetchAgencyBySlug(slug);
+    if (!agency) {
+      return res.status(404).json({ error: "Agência não encontrada" });
+    }
+
+    // 2. Buscar imóveis filtrados por agency_id
+    const url =
+      `${SUPABASE_URL}/rest/v1/properties` +
+      `?agency_id=eq.${encodeURIComponent(agency.id)}` +
+      `&select=id,title,price,typology,area,concelho,parish,photos,status` +
+      `&status=eq.active` +
+      `&order=created_at.desc` +
+      `&limit=${limit}&offset=${offset}`;
+
+    const options = {
+      headers: {
+        apikey:        SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Accept:        "application/json",
+        // Pedir contagem total para paginação
+        Prefer:        "count=exact",
+      },
+    };
+
+    https.get(url, options, propRes => {
+      let data = "";
+      propRes.on("data", chunk => (data += chunk));
+      propRes.on("end", () => {
+        try {
+          const properties = JSON.parse(data);
+          // Supabase devolve o total no header Content-Range: 0-11/48
+          const range = propRes.headers["content-range"] || "";
+          const total = parseInt((range.split("/")[1] || "0"), 10);
+
+          res.setHeader("Cache-Control", "public, max-age=60");
+          res.json({ agency, properties, total, page, limit });
+        } catch (e) {
+          res.status(500).json({ error: "Erro ao parsear imóveis" });
+        }
+      });
+    }).on("error", err => {
+      console.error("[AGENCY PROPS] Erro:", err.message);
+      res.status(500).json({ error: "Erro interno" });
+    });
+
+  } catch (err) {
+    console.error("[AGENCY PROPS] Erro:", err.message);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+
 app.use(express.static(BUILD_DIR));
 
 // ── SPA fallback: todas as outras rotas devolvem o index.html ─────────────
