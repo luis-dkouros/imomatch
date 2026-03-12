@@ -455,23 +455,27 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       }
     }
 
-    // Usar SEMPRE o /invite — se o utilizador não existe cria e envia email.
-    // Se já existe, o Supabase reenvía o email de convite sem criar duplicado.
-    const inviteRes = await supabaseRequest({
+    // Criar conta sem enviar email automático do Supabase
+    // Usamos /admin/users com email_confirm=true e depois enviamos email personalizado via Resend
+    const createRes = await supabaseRequest({
       method: "POST",
-      path:   `/auth/v1/invite?redirect_to=${encodeURIComponent(SITE_URL + "/?welcome=agency")}`,
-      body:   { email },
+      path:   "/auth/v1/admin/users",
+      body: {
+        email,
+        email_confirm: false, // não confirmar ainda — o agente vai confirmar via link
+        password: Math.random().toString(36).slice(2,10) + "Aa1!", // senha temporária
+      },
       useServiceKey: true,
     });
 
-    if (inviteRes.status !== 200 && inviteRes.status !== 201) {
-      console.error("[INVITE] Erro:", JSON.stringify(inviteRes.body));
-      return res.status(500).json({ error: "Erro ao enviar convite: " + (inviteRes.body?.message || inviteRes.body?.msg || "erro desconhecido") });
+    if (createRes.status !== 200 && createRes.status !== 201) {
+      console.error("[INVITE] Erro ao criar conta:", JSON.stringify(createRes.body));
+      return res.status(500).json({ error: "Erro ao criar conta: " + (createRes.body?.message || "erro desconhecido") });
     }
 
-    const userId = inviteRes.body?.id;
+    const userId = createRes.body?.id;
 
-    // Criar ou actualizar perfil ligado à agência (upsert via Prefer: resolution=merge-duplicates)
+    // Criar ou actualizar perfil ligado à agência
     await supabaseRequest({
       method: "POST",
       path:   "/rest/v1/profiles",
@@ -503,9 +507,9 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
     const agencyName  = ag.name  || "a tua agência";
     const agencyColor = ag.primary_color || "#3BB2A1";
 
-    // Enviar email personalizado via Resend (substitui o email genérico do Supabase)
+    // Enviar email personalizado via Resend
     if (process.env.RESEND_API_KEY) {
-      // Gerar magic link para entrada directa
+      // Gerar link de convite com redirect para a app
       const linkRes = await supabaseRequest({
         method: "POST",
         path:   "/auth/v1/admin/generate_link",
@@ -516,7 +520,11 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         },
         useServiceKey: true,
       });
-      const actionLink = linkRes.body?.properties?.action_link || `${SITE_URL}`;
+      console.log("[INVITE] generate_link response:", JSON.stringify(linkRes.body));
+      // O link está em properties.action_link
+      const actionLink = linkRes.body?.properties?.action_link
+        || linkRes.body?.action_link
+        || `${SITE_URL}/?welcome=agency`;
 
       await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -533,7 +541,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:sans-serif">
   <div style="max-width:520px;margin:40px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
     <div style="background:${agencyColor};padding:32px 32px 24px">
-      ${ag.logo_url ? `<img src="${ag.logo_url}" height="48" style="margin-bottom:16px;border-radius:8px;background:#fff;padding:4px"/>` : ""}
+      ${ag.logo_url ? `<img src="${ag.logo_url}" height="48" style="margin-bottom:16px;border-radius:8px;background:#fff;padding:4px;display:block"/>` : `<div style="font-size:28px;margin-bottom:12px">🏢</div>`}
       <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:800">${agencyName}</h1>
       <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px">Convite para a equipa</p>
     </div>
