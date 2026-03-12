@@ -1076,7 +1076,39 @@ function LoginScreen({dark}) {
       });
       if(profileErr) { setError("Conta criada mas erro no perfil: " + profileErr.message); setLoading(false); return; }
 
-      // 3. Ir para Stripe Checkout
+      // 3. Verificar se há convite de agência pendente para este email
+      const { data: inviteData } = await supabase
+        .from("agency_invites")
+        .select("agency_id")
+        .eq("email", email.trim().toLowerCase())
+        .eq("status", "pending")
+        .single();
+
+      if (inviteData?.agency_id) {
+        // Agente convidado por agência — ligar directamente, sem Stripe
+        await supabase.from("profiles").upsert({
+          id:          userId,
+          name:        name.trim(),
+          phone:       phone.trim(),
+          bio:         bio.trim(),
+          photo_url:   finalPhotoUrl || photoUrl,
+          plan:        "agency",
+          agency_id:   inviteData.agency_id,
+          agency_role: "agent",
+          updated_at:  new Date().toISOString()
+        });
+        // Marcar convite como aceite
+        await supabase.from("agency_invites")
+          .update({ status: "accepted" })
+          .eq("agency_id", inviteData.agency_id)
+          .eq("email", email.trim().toLowerCase());
+        // Redirecionar para a app directamente
+        window.history.replaceState({},"","/?welcome=agency");
+        setLoading(false);
+        return;
+      }
+
+      // 4. Sem convite → fluxo normal Stripe
       const baseLink = signupPlan === "30dias"
         ? (process.env.REACT_APP_STRIPE_LINK_30D || "https://buy.stripe.com/eVq14nbbK0K87Hv4dEcfK01")
         : (process.env.REACT_APP_STRIPE_LINK || "#");
@@ -1989,11 +2021,12 @@ function ImoPro() {
   });
 
   const userPlan=(profile?.plan||"pending").toLowerCase();
-  const isBasic = userPlan==="basic";
+  const isBasic   = userPlan==="basic";
+  const isAgency  = userPlan==="agency";  // agente pago pela agência
   const isPending = userPlan==="pending" || userPlan==="expired" || userPlan==="past_due";
   const isTrialActive = false;
   const trialDaysLeft = 0;
-  const hasAccess = isBasic;
+  const hasAccess = isBasic || isAgency;
   const planLimits = PLAN_LIMITS[userPlan] || PLAN_LIMITS["pending"];
 
   // ── CRUD: Contacts ──

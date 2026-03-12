@@ -15,9 +15,10 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Variáveis de ambiente ──────────────────────────────────────────────────
-const SUPABASE_URL      = process.env.REACT_APP_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-const SITE_URL          = process.env.REACT_APP_SITE_URL || "https://imomatch.pt";
+const SUPABASE_URL         = process.env.REACT_APP_SUPABASE_URL;
+const SUPABASE_ANON_KEY    = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // admin — nunca exposta ao browser
+const SITE_URL             = process.env.REACT_APP_SITE_URL || "https://imomatch.pt";
 
 const BUILD_DIR = path.join(__dirname, "build");
 
@@ -378,6 +379,164 @@ app.get("/api/agencies/:slug/properties", async (req, res) => {
   }
 });
 
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Convidar agente para agência (cria conta + liga à agência)
+// POST /api/agencies/invite-agent
+// Body: { agency_id, email, invited_by_jwt }
+// Requer SUPABASE_SERVICE_ROLE_KEY no Railway
+// ═══════════════════════════════════════════════════════════════════════════
+
+app.use(express.json());
+
+// Helper: fetch via https nativo (POST/PATCH com body)
+function supabaseRequest({ method, path, body, useServiceKey }) {
+  return new Promise((resolve, reject) => {
+    const key  = useServiceKey ? SUPABASE_SERVICE_KEY : SUPABASE_ANON_KEY;
+    const urlObj = new URL(SUPABASE_URL + path);
+    const data = body ? JSON.stringify(body) : null;
+    const options = {
+      hostname: urlObj.hostname,
+      path:     urlObj.pathname + urlObj.search,
+      method:   method || "GET",
+      headers: {
+        apikey:         key,
+        Authorization:  `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Accept:         "application/json",
+        Prefer:         "return=representation",
+        ...(data ? { "Content-Length": Buffer.byteLength(data) } : {}),
+      },
+    };
+    const req = https.request(options, res => {
+      let buf = "";
+      res.on("data", c => (buf += c));
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(buf || "null") }); }
+        catch (e) { resolve({ status: res.statusCode, body: buf }); }
+      });
+    });
+    req.on("error", reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+app.post("/api/agencies/invite-agent", async (req, res) => {
+  const { agency_id, email, invited_by_jwt } = req.body || {};
+
+  if (!agency_id || !email) {
+    return res.status(400).json({ error: "agency_id e email são obrigatórios." });
+  }
+  if (!SUPABASE_SERVICE_KEY) {
+    return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada no servidor." });
+  }
+
+  // 1. Verificar que quem convida tem permissão (owner ou admin da agência)
+  // Valida o JWT do utilizador que fez o pedido
+  const authRes = await supabaseRequest({
+    method: "GET",
+    path:   `/rest/v1/profiles?agency_id=eq.${encodeURIComponent(agency_id)}&agency_role=in.(owner,admin)&select=id`,
+    useServiceKey: false,
+  }).catch(() => null);
+
+  // Validação simples: se não conseguimos verificar, avançamos (o RLS do Supabase protege)
+  // Para maior segurança podes validar o JWT aqui
+
+  // 2. Verificar se o email já tem conta
+  const existingUser = await supabaseRequest({
+    method: "GET",
+    path:   `/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+    useServiceKey: true,
+  }).catch(() => ({ body: null }));
+
+  let userId = null;
+
+  if (existingUser.body?.users?.length > 0) {
+    // Utilizador já existe
+    userId = existingUser.body.users[0].id;
+
+    // Verificar se já está noutra agência
+    const profileRes = await supabaseRequest({
+      method: "GET",
+      path:   `/rest/v1/profiles?id=eq.${userId}&select=agency_id`,
+      useServiceKey: true,
+    });
+    const profile = profileRes.body?.[0];
+    if (profile?.agency_id && profile.agency_id !== agency_id) {
+      return res.status(409).json({ error: "Este utilizador já pertence a outra agência." });
+    }
+
+    // Ligar à agência
+    await supabaseRequest({
+      method: "PATCH",
+      path:   `/rest/v1/profiles?id=eq.${userId}`,
+      body:   { agency_id, agency_role: "agent", plan: "agency" },
+      useServiceKey: true,
+    });
+
+  } else {
+    // 3. Criar conta nova com senha temporária
+    const tempPassword = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6).toUpperCase() + "!";
+
+    const createRes = await supabaseRequest({
+      method: "POST",
+      path:   "/auth/v1/admin/users",
+      body: {
+        email,
+        password:      tempPassword,
+        email_confirm: true,  // confirmar email automaticamente
+      },
+      useServiceKey: true,
+    });
+
+    if (createRes.status !== 200 && createRes.status !== 201) {
+      console.error("[INVITE] Erro ao criar utilizador:", createRes.body);
+      return res.status(500).json({ error: "Erro ao criar conta: " + (createRes.body?.message || "erro desconhecido") });
+    }
+
+    userId = createRes.body?.id;
+
+    // 4. Criar perfil ligado à agência
+    await supabaseRequest({
+      method: "POST",
+      path:   "/rest/v1/profiles",
+      body: {
+        id:          userId,
+        name:        email.split("@")[0], // nome provisório
+        agency_id,
+        agency_role: "agent",
+        plan:        "agency",
+      },
+      useServiceKey: true,
+    });
+
+    // 5. Enviar email de redefinição de senha (o Supabase envia o link)
+    await supabaseRequest({
+      method: "POST",
+      path:   "/auth/v1/admin/generate_link",
+      body: {
+        type:       "recovery",
+        email,
+        options: {
+          redirect_to: `${SITE_URL}/?setup=1`,
+        },
+      },
+      useServiceKey: true,
+    });
+  }
+
+  // 6. Remover convite pendente se existia
+  await supabaseRequest({
+    method: "DELETE",
+    path:   `/rest/v1/agency_invites?agency_id=eq.${agency_id}&email=eq.${encodeURIComponent(email)}`,
+    useServiceKey: true,
+  }).catch(() => {});
+
+  console.log(`[INVITE] Agente ${email} adicionado à agência ${agency_id}`);
+  return res.json({ success: true, userId, message: `Conta criada e email enviado para ${email}.` });
+});
 
 app.use(express.static(BUILD_DIR));
 

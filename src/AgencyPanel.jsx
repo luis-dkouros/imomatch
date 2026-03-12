@@ -235,71 +235,31 @@ export default function AgencyPanel({ supabase, session, profile, dark, onNotif 
     }
   };
 
-  // ── Convidar agente ───────────────────────────────────────────────────────
-  // Cria convite pendente em agency_invites.
-  // Se o utilizador já tem conta → liga directamente.
-  // Se não tem → convite fica pendente; quando criar conta é ligado automaticamente.
+  // ── Convidar agente via servidor ─────────────────────────────────────────
+  // O server.js usa a service_role key para:
+  //   - Se já tem conta → liga directamente à agência
+  //   - Se não tem conta → cria conta, liga à agência, envia email com link de senha
   const handleInvite = async () => {
     const email = inviteEmail.trim().toLowerCase();
     if (!email) return;
     if (atLimit) { setError(`Limite de ${maxUsers} agentes atingido.`); return; }
     setInviting(true); setError("");
     try {
-      // Verificar se já tem conta
-      const found = await sbGet(
-        `profiles?select=id,name,agency_id&id=in.(${
-          // buscar por auth.users via RPC não disponível sem admin key
-          // fallback: procurar pelo email na tabela profiles (se preenchido)
-          // senão guarda apenas o convite
-          `"00000000-0000-0000-0000-000000000000"`
-        })`, jwt
-      ).catch(() => []);
-
-      // Tentar ligar directamente se existir em profiles com email
-      const byEmail = await sbGet(
-        `profiles?email=eq.${encodeURIComponent(email)}&select=id,name,agency_id`, jwt
-      ).catch(() => []);
-
-      if (byEmail.length > 0) {
-        const u = byEmail[0];
-        if (u.agency_id && u.agency_id !== agency.id) {
-          setError("Este utilizador já pertence a outra agência.");
-          setInviting(false); return;
-        }
-        // Ligar directamente
-        await sbPatch(`profiles?id=eq.${u.id}`, {
-          agency_id: agency.id, agency_role: "agent", plan: "agency",
-        }, jwt);
-        onNotif(`✅ ${u.name} adicionado à equipa.`);
-        setInviteEmail("");
-        loadAgency();
-        setInviting(false);
+      const r = await fetch("/api/agencies/invite-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ agency_id: agency.id, email, invited_by_jwt: jwt }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        setError(data.error || "Erro ao convidar agente.");
         return;
       }
-
-      // Sem conta ainda → criar convite pendente
-      // Verificar se já existe convite para este email
-      const existing = await sbGet(
-        `agency_invites?agency_id=eq.${agency.id}&email=eq.${encodeURIComponent(email)}&status=eq.pending&select=id`, jwt
-      ).catch(() => []);
-
-      if (existing.length > 0) {
-        setError("Já existe um convite pendente para este email.");
-        setInviting(false); return;
-      }
-
-      await sbPost(`agency_invites`, {
-        agency_id:  agency.id,
-        email,
-        invited_by: session.user.id,
-        status:     "pending",
-      }, jwt);
-
-      onNotif(`📧 Convite registado para ${email}. Quando criar conta será ligado automaticamente.`);
+      onNotif(`✅ ${data.message}`);
       setInviteEmail("");
       loadAgency();
     } catch (e) {
-      setError("Erro: " + e.message);
+      setError("Erro de ligação ao servidor.");
     } finally {
       setInviting(false);
     }
