@@ -1868,16 +1868,28 @@ function ImoPro() {
   },[session]);
 
   // ── Handle convite de agência (?welcome=agency) ──
-  // O agente chegou via link de convite — já está autenticado e ligado à agência
   useEffect(()=>{
     const params = new URLSearchParams(window.location.search);
     if(params.get("welcome")==="agency" && session){
       window.history.replaceState({},"",window.location.pathname);
-      // Recarregar perfil para obter plan="agency" e agency_id actualizados
-      loadProfile();
-      setPage("dashboard");
-      setNotif("🎉 Bem-vindo à tua agência! O teu acesso está activo.");
-      setTimeout(()=>setNotif(null),6000);
+      setNotif("⏳ A activar o teu acesso...");
+      // Polling até o perfil ter plan=agency (o servidor pode ainda estar a actualizar)
+      let tries = 0;
+      const poll = setInterval(async () => {
+        tries++;
+        const { data } = await supabase
+          .from("profiles")
+          .select("plan,agency_id,agency_role,name,phone,bio,photo_url,website,stripe_customer_id,created_at")
+          .eq("id", session.user.id)
+          .single();
+        if (data?.plan === "agency" || tries >= 10) {
+          clearInterval(poll);
+          if (data) setProfile(data);
+          setPage("dashboard");
+          setNotif("🎉 Bem-vindo! O teu acesso à agência está activo.");
+          setTimeout(() => setNotif(null), 6000);
+        }
+      }, 1000);
     }
   },[session]);
 

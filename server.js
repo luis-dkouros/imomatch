@@ -443,52 +443,70 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
     });
     const existingUser = existingRes.body?.users?.[0] || null;
 
+    let userId;
+
     if (existingUser) {
+      // ── Utilizador já tem conta ──────────────────────────────────────────
+      userId = existingUser.id;
+
+      // Verificar se já está noutra agência
       const profileRes = await supabaseRequest({
         method: "GET",
-        path:   `/rest/v1/profiles?id=eq.${existingUser.id}&select=agency_id`,
+        path:   `/rest/v1/profiles?id=eq.${userId}&select=agency_id`,
         useServiceKey: true,
       });
       const p = profileRes.body?.[0];
       if (p?.agency_id && p.agency_id !== agency_id) {
         return res.status(409).json({ error: "Este utilizador já pertence a outra agência." });
       }
+
+      // Actualizar perfil com dados da agência
+      await supabaseRequest({
+        method: "PATCH",
+        path:   `/rest/v1/profiles?id=eq.${userId}`,
+        body:   { agency_id, agency_role: "agent", plan: "agency" },
+        useServiceKey: true,
+      });
+
+      console.log(`[INVITE] Utilizador existente ${email} vinculado à agência ${agency_id}`);
+
+    } else {
+      // ── Utilizador sem conta — criar ──────────────────────────────────────
+      const createRes = await supabaseRequest({
+        method: "POST",
+        path:   "/auth/v1/admin/users",
+        body: {
+          email,
+          email_confirm: true,
+          password: Math.random().toString(36).slice(2,10) + "Aa1!",
+        },
+        useServiceKey: true,
+      });
+
+      if (createRes.status !== 200 && createRes.status !== 201) {
+        console.error("[INVITE] Erro ao criar conta:", JSON.stringify(createRes.body));
+        return res.status(500).json({ error: "Erro ao criar conta: " + (createRes.body?.message || "erro desconhecido") });
+      }
+
+      userId = createRes.body?.id;
+
+      // Criar perfil ligado à agência
+      await supabaseRequest({
+        method: "POST",
+        path:   "/rest/v1/profiles",
+        body: {
+          id:          userId,
+          name:        email.split("@")[0],
+          agency_id,
+          agency_role: "agent",
+          plan:        "agency",
+        },
+        useServiceKey: true,
+        extraHeaders: { Prefer: "return=representation,resolution=merge-duplicates" },
+      });
+
+      console.log(`[INVITE] Nova conta criada para ${email} na agência ${agency_id}`);
     }
-
-    // Criar conta sem enviar email automático do Supabase
-    // Usamos /admin/users com email_confirm=true e depois enviamos email personalizado via Resend
-    const createRes = await supabaseRequest({
-      method: "POST",
-      path:   "/auth/v1/admin/users",
-      body: {
-        email,
-        email_confirm: false, // não confirmar ainda — o agente vai confirmar via link
-        password: Math.random().toString(36).slice(2,10) + "Aa1!", // senha temporária
-      },
-      useServiceKey: true,
-    });
-
-    if (createRes.status !== 200 && createRes.status !== 201) {
-      console.error("[INVITE] Erro ao criar conta:", JSON.stringify(createRes.body));
-      return res.status(500).json({ error: "Erro ao criar conta: " + (createRes.body?.message || "erro desconhecido") });
-    }
-
-    const userId = createRes.body?.id;
-
-    // Criar ou actualizar perfil ligado à agência
-    await supabaseRequest({
-      method: "POST",
-      path:   "/rest/v1/profiles",
-      body: {
-        id:          userId,
-        name:        email.split("@")[0],
-        agency_id,
-        agency_role: "agent",
-        plan:        "agency",
-      },
-      useServiceKey: true,
-      extraHeaders: { Prefer: "return=representation,resolution=merge-duplicates" },
-    });
 
     // Limpar convite pendente se existia
     await supabaseRequest({
