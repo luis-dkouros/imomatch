@@ -2435,7 +2435,10 @@ function ImoPro() {
             </div>}
           </div>
           <nav style={{flex:1,padding:"12px 8px",display:"flex",flexDirection:"column",gap:2,overflowY:"auto"}}>
-            {(isAgency?NAV_ITEMS_AGENCY:NAV_ITEMS_BASE).map(({id,icon,label})=>{
+            {(isAgency?NAV_ITEMS_AGENCY:NAV_ITEMS_BASE).filter(({id})=>{
+              if(id==="agency") return profile?.agency_role==="owner" || profile?.agency_role==="admin";
+              return true;
+            }).map(({id,icon,label})=>{
               const isLocked=!hasAccess&&id==="social";
               const isBillingAlert=id==="billing"&&!hasAccess&&(contacts.length>=8||properties.length>=1);
               const active=page===id;
