@@ -532,10 +532,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
           email_confirm: true,
           password: Math.random().toString(36).slice(2,10) + "Aa1!",
           user_metadata: {
-            name:        email.split("@")[0],
-            plan:        "agency",
-            agency_id,
-            agency_role: "member",
+            name: email.split("@")[0],
           },
         },
         useServiceKey: true,
@@ -549,7 +546,18 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       }
 
       userId = createRes.body?.id;
-      console.log(`[INVITE] Nova conta criada para ${email} na agência ${agency_id} — perfil criado pelo trigger`);
+      console.log(`[INVITE] Nova conta criada para ${email} (${userId})`);
+
+      // Actualizar perfil com dados da agência (o trigger cria o perfil básico, nós actualizamos)
+      await new Promise(r => setTimeout(r, 500)); // aguardar trigger
+      const newPatchRes = await supabaseRequest({
+        method: "PATCH",
+        path:   `/rest/v1/profiles?id=eq.${userId}`,
+        body:   { agency_id, agency_role: "member", plan: "agency" },
+        useServiceKey: true,
+        extraHeaders:  { Prefer: "return=representation" },
+      });
+      console.log(`[INVITE] Perfil actualizado: ${newPatchRes.status}`, JSON.stringify(newPatchRes.body));
     }
 
     // Limpar convite pendente se existia
