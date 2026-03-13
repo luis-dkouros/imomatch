@@ -2316,6 +2316,9 @@ function ImoPro() {
 
   if(!session) return <LoginScreen dark={dark}/>;
 
+  // ── Gate: definir senha (agentes convidados) ──
+  if(showSetPassword) return <SetPasswordScreen session={session} dark={dark} onDone={()=>{setShowSetPassword(false);setPage("dashboard");setNotif("🎉 Bem-vindo! Senha definida com sucesso.");setTimeout(()=>setNotif(null),5000);}}/>
+
   // ── Gate: plano pending/expired → forçar pagamento ──
   const currentPlan = (profile?.plan||"pending").toLowerCase();
   if(profile && (currentPlan==="pending" || currentPlan==="expired")) {
