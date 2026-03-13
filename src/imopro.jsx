@@ -987,9 +987,18 @@ function SetPasswordScreen({ session, onDone, dark }) {
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
 
   const handleSubmit = async () => {
-    if (pass.length < 6)        { setError("A senha deve ter pelo menos 6 caracteres."); return; }
-    if (pass !== confirm)        { setError("As senhas não coincidem."); return; }
+    if (pass.length < 6) { setError("A senha deve ter pelo menos 6 caracteres."); return; }
+    if (pass !== confirm) { setError("As senhas não coincidem."); return; }
     setLoading(true); setError("");
+    // Refrescar sessão antes de actualizar — garante que o JWT é válido
+    const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr || !refreshData?.session) {
+      // Sessão inválida ou expirada — limpar e pedir novo login
+      await supabase.auth.signOut();
+      setError("A sessão expirou. Por favor entra com o link do email novamente.");
+      setLoading(false);
+      return;
+    }
     const { error: err } = await supabase.auth.updateUser({ password: pass });
     if (err) { setError("Erro: " + err.message); setLoading(false); return; }
     onDone();
