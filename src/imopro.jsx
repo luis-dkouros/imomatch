@@ -965,6 +965,101 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
   );
 }
 
+
+// ── Ecrã de definir senha (agentes convidados) ────────────────────────────────
+function SetPasswordScreen({ session, onDone, dark }) {
+  const teal  = "#3BB2A1";
+  const bg    = dark ? "#0f172a" : "#f1f5f9";
+  const card  = dark ? "#1e293b" : "#ffffff";
+  const text  = dark ? "#f1f5f9" : "#0f172a";
+  const muted = dark ? "#94a3b8" : "#64748b";
+  const inp   = dark ? "#0f172a" : "#f8fafc";
+  const inpB  = dark ? "#334155" : "#e2e8f0";
+  const border= dark ? "#334155" : "#e2e8f0";
+
+  const [pass,    setPass]    = React.useState("");
+  const [confirm, setConfirm] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error,   setError]   = React.useState("");
+  const [showP,   setShowP]   = React.useState(false);
+  const [showC,   setShowC]   = React.useState(false);
+
+  const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
+
+  const handleSubmit = async () => {
+    if (pass.length < 6)        { setError("A senha deve ter pelo menos 6 caracteres."); return; }
+    if (pass !== confirm)        { setError("As senhas não coincidem."); return; }
+    setLoading(true); setError("");
+    const { error: err } = await supabase.auth.updateUser({ password: pass });
+    if (err) { setError("Erro: " + err.message); setLoading(false); return; }
+    onDone();
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ background:card, border:`1px solid ${border}`, borderRadius:20, padding:36, width:"100%", maxWidth:420, boxShadow:"0 8px 40px rgba(0,0,0,0.1)" }}>
+        <div style={{ textAlign:"center", marginBottom:28 }}>
+          <div style={{ fontSize:40, marginBottom:12 }}>🔐</div>
+          <div style={{ fontSize:22, fontWeight:800, color:text, marginBottom:8 }}>Define a tua senha</div>
+          <div style={{ fontSize:14, color:muted, lineHeight:1.5 }}>
+            Para acederes ao ImoMatch nas próximas vezes,<br/>define uma senha pessoal agora.
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ background:"#ef444411", border:"1px solid #ef444433", borderRadius:8, padding:"10px 14px", color:"#ef4444", fontSize:13, marginBottom:16 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          <div>
+            <label style={{ display:"block", fontSize:11, fontWeight:700, color:muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.06em" }}>Nova Senha</label>
+            <div style={{ position:"relative" }}>
+              <input type={showP?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)}
+                placeholder="Mínimo 6 caracteres" style={INP}/>
+              <button onClick={()=>setShowP(v=>!v)}
+                style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:muted, cursor:"pointer", padding:0, fontSize:16 }}>
+                {showP?"🙈":"👁️"}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label style={{ display:"block", fontSize:11, fontWeight:700, color:muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.06em" }}>Confirmar Senha</label>
+            <div style={{ position:"relative" }}>
+              <input type={showC?"text":"password"} value={confirm} onChange={e=>setConfirm(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&handleSubmit()}
+                placeholder="Repete a senha" style={INP}/>
+              <button onClick={()=>setShowC(v=>!v)}
+                style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:muted, cursor:"pointer", padding:0, fontSize:16 }}>
+                {showC?"🙈":"👁️"}
+              </button>
+            </div>
+          </div>
+
+          {/* Indicador de força */}
+          {pass.length > 0 && (
+            <div style={{ display:"flex", gap:4 }}>
+              {[1,2,3,4].map(i=>(
+                <div key={i} style={{ flex:1, height:4, borderRadius:99, background: pass.length>=i*3 ? (i<=2?"#f59e0b":i===3?"#3BB2A1":"#10b981") : (dark?"#334155":"#e2e8f0"), transition:"background 0.3s" }}/>
+              ))}
+            </div>
+          )}
+
+          <button onClick={handleSubmit} disabled={loading||!pass||!confirm}
+            style={{ background:teal, color:"#fff", border:"none", borderRadius:10, padding:"13px", fontWeight:700, fontSize:15, cursor:"pointer", fontFamily:"inherit", opacity:(!pass||!confirm)?0.6:1, marginTop:4 }}>
+            {loading ? "A guardar..." : "Definir senha e entrar →"}
+          </button>
+        </div>
+
+        <div style={{ textAlign:"center", marginTop:20, fontSize:12, color:muted }}>
+          A tua senha é privada e segura.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoginScreen({dark}) {
   const [mode,     setMode]     = useState("login");
   // login fields
@@ -1812,6 +1907,7 @@ function ImoPro() {
   const [profile,   setProfile]   = useState(null);
   const [agencyTheme, setAgencyTheme] = useState(null); // cores/dados da agência do agente
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSetPassword, setShowSetPassword]   = useState(false);
   const [selectedProps, setSelectedProps] = useState([]);
   const [selectedContacts, setSelectedContacts] = useState([]);
   const [confirmDeleteContacts, setConfirmDeleteContacts] = useState(false);
@@ -1873,7 +1969,6 @@ function ImoPro() {
     if(params.get("welcome")==="agency" && session){
       window.history.replaceState({},"",window.location.pathname);
       setNotif("⏳ A activar o teu acesso...");
-      // Polling até o perfil ter plan=agency (o servidor pode ainda estar a actualizar)
       let tries = 0;
       const poll = setInterval(async () => {
         tries++;
@@ -1885,9 +1980,9 @@ function ImoPro() {
         if (data?.plan === "agency" || tries >= 10) {
           clearInterval(poll);
           if (data) setProfile(data);
-          setPage("dashboard");
-          setNotif("🎉 Bem-vindo! O teu acesso à agência está activo.");
-          setTimeout(() => setNotif(null), 6000);
+          setNotif(null);
+          // Mostrar ecrã de definir senha antes de entrar na app
+          setShowSetPassword(true);
         }
       }, 1000);
     }
@@ -2947,6 +3042,7 @@ function ImoPro() {
         </div>
       )}
       {showProfileModal&&<ProfileModal profile={profile} session={session} onClose={()=>setShowProfileModal(false)} onSaved={p=>{setProfile(p);}} theme={theme} isMobile={isMobile}/>}
+      {showSetPassword&&<SetPasswordScreen session={session} dark={dark} onDone={()=>{setShowSetPassword(false);setPage("dashboard");setNotif("🎉 Bem-vindo! Senha definida com sucesso.");setTimeout(()=>setNotif(null),5000);}}/>}
       {editContact&&<ContactForm contact={editContact} setContact={setEditContact} onSave={saveContact} onDelete={deleteContact} onClose={()=>setEditContact(null)} isNew={isNewContact} isMobile={isMobile} theme={theme}/>}
       {editProperty&&<PropertyForm property={editProperty} setProperty={setEditProperty} onSave={saveProperty} onDelete={deleteProperty} onClose={()=>setEditProperty(null)} isNew={isNewProperty} isMobile={isMobile} theme={theme} onPhotos={handlePhotos}/>}
       {sendProp&&<SendModal property={sendProp} contacts={contacts} session={session} onClose={()=>setSendProp(null)} isMobile={isMobile} theme={theme}/>}
