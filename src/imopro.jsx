@@ -977,12 +977,21 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const inpB  = dark ? "#334155" : "#e2e8f0";
   const border= dark ? "#334155" : "#e2e8f0";
 
-  const [pass,    setPass]    = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
-  const [showP,   setShowP]   = useState(false);
-  const [showC,   setShowC]   = useState(false);
+  const [pass,       setPass]       = useState("");
+  const [confirm,    setConfirm]    = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
+  const [showP,      setShowP]      = useState(false);
+  const [showC,      setShowC]      = useState(false);
+  const [localEmail, setLocalEmail] = useState(session?.user?.email || null);
+
+  // Obter sessão directamente no mount — não depender do estado React que pode ainda não ter actualizado
+  useEffect(() => {
+    if (localEmail) return;
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session?.user?.email) setLocalEmail(data.session.user.email);
+    });
+  }, []);
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
 
@@ -991,11 +1000,7 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
     if (pass !== confirm) { setError("As senhas não coincidem."); return; }
     setLoading(true); setError("");
     // Obter email da sessão actual (pode ser session ou via getSession)
-    let userEmail = session?.user?.email;
-    if (!userEmail) {
-      const { data: s } = await supabase.auth.getSession();
-      userEmail = s?.session?.user?.email;
-    }
+    const userEmail = localEmail;
     if (!userEmail) {
       setError("Sessão inválida. Por favor usa o link do email novamente.");
       setLoading(false);
