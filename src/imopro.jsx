@@ -1493,7 +1493,7 @@ function LoginScreen({dark}) {
 
 const NAV_ITEMS_BASE=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"},{id:"help",icon:"help_outline",label:"Ajuda"}];
 const NAV_ITEMS_AGENCY=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"agency",icon:"business",label:"Agência"},{id:"billing",icon:"credit_card",label:"Plano"},{id:"help",icon:"help_outline",label:"Ajuda"}];
-const PLAN_LIMITS={pending:{contacts:0,properties:0},trial:{contacts:0,properties:0},basic:{contacts:Infinity,properties:Infinity},agency:{contacts:Infinity,properties:Infinity}};
+const PLAN_LIMITS={pending:{contacts:0,properties:0},trial:{contacts:0,properties:0},basic:{contacts:Infinity,properties:Infinity},agency:{contacts:Infinity,properties:Infinity},starter:{contacts:Infinity,properties:Infinity},growth:{contacts:Infinity,properties:Infinity}};
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
 const STRIPE_LINK_30D=process.env.REACT_APP_STRIPE_LINK_30D||"https://buy.stripe.com/eVq14nbbK0K87Hv4dEcfK01";
 const META_APP_ID=process.env.REACT_APP_META_APP_ID||"1558755848548021";
@@ -2175,11 +2175,11 @@ function ImoPro() {
 
   const userPlan=(profile?.plan||"pending").toLowerCase();
   const isBasic   = userPlan==="basic";
-  const isAgency  = userPlan==="agency";  // agente pago pela agência
+  const isAgency  = userPlan==="agency" || profile?.agency_role==="owner" || profile?.agency_role==="admin";  // owner, admin ou agente
   const isPending = userPlan==="pending" || userPlan==="expired" || userPlan==="past_due";
   const isTrialActive = false;
   const trialDaysLeft = 0;
-  const hasAccess = isBasic || isAgency;
+  const hasAccess = isBasic || isAgency || profile?.agency_role==="owner" || profile?.agency_role==="admin";
   const planLimits = PLAN_LIMITS[userPlan] || PLAN_LIMITS["pending"];
 
   // ── CRUD: Contacts ──
