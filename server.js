@@ -541,9 +541,11 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         useServiceKey: true,
       });
 
+      console.log(`[INVITE] CREATE response: ${createRes.status}`, JSON.stringify(createRes.body));
       if (createRes.status !== 200 && createRes.status !== 201) {
-        console.error("[INVITE] Erro ao criar conta:", JSON.stringify(createRes.body));
-        return res.status(500).json({ error: "Erro ao criar conta: " + (createRes.body?.message || "erro desconhecido") });
+        const errMsg = createRes.body?.message || createRes.body?.error_description || createRes.body?.msg || JSON.stringify(createRes.body);
+        console.error("[INVITE] Erro ao criar conta:", errMsg);
+        return res.status(500).json({ error: "Erro ao criar conta: " + errMsg });
       }
 
       userId = createRes.body?.id;
