@@ -2017,23 +2017,44 @@ function ImoPro() {
     const params = new URLSearchParams(window.location.search);
     if(params.get("payment")==="success"){
       window.history.replaceState({},"",window.location.pathname);
-      // Mostra loading enquanto webhook actualiza o plano (até 15s)
       setNotif("⏳ A activar o teu plano...");
       let tries = 0;
       const poll = setInterval(async()=>{
         tries++;
-        const {data} = await supabase.from("profiles").select("plan,name,phone,agency,bio,photo_url,website,stripe_customer_id,created_at").eq("id",session?.user?.id).single();
-        if(data?.plan==="basic" || tries>=15){
+        // Verificar perfil
+        const {data:prof} = await supabase.from("profiles")
+          .select("plan,name,phone,agency,bio,photo_url,website,stripe_customer_id,created_at,agency_id,agency_role")
+          .eq("id",session?.user?.id).single();
+
+        // Verificar agência (se owner)
+        let agencyActivated = false;
+        if(prof?.agency_id){
+          const {data:ag} = await supabase.from("agencies")
+            .select("id,name,slug,logo_url,primary_color,secondary_color,plan,max_users,active,owner_id")
+            .eq("id",prof.agency_id).single();
+          if(ag?.plan==="starter"||ag?.plan==="growth"){
+            agencyActivated = true;
+            setAgencyTheme(ag);
+          }
+        }
+
+        const basicActivated = prof?.plan==="basic";
+
+        if(basicActivated || agencyActivated || tries>=15){
           clearInterval(poll);
-          if(data?.plan==="basic"){
-            setProfile(data);
+          if(basicActivated){
+            setProfile(prof);
             setPage("dashboard");
             setNotif("🎉 Bem-vindo ao ImoMatch! O teu plano Basic está activo.");
             setTimeout(()=>setNotif(null),5000);
+          } else if(agencyActivated){
+            setProfile(p=>({...p,...prof}));
+            setPage("dashboard");
+            setNotif("🎉 Agência activada! Podes agora convidar a tua equipa.");
+            setTimeout(()=>setNotif(null),6000);
           } else {
-            // Webhook ainda não chegou — actualiza UI assim mesmo e aguarda
-            setProfile(p=>({...p,...data}));
-            setNotif("✅ Conta criada! O plano será activado em instantes.");
+            setProfile(p=>({...p,...prof}));
+            setNotif("✅ Pagamento recebido! O plano será activado em instantes.");
             setTimeout(()=>setNotif(null),5000);
           }
         }
@@ -2782,11 +2803,10 @@ function ImoPro() {
                           <span style={{fontSize:12,color:text}}>{f}</span>
                         </div>
                       ))}
-                      <a href={(()=>{try{const u=new URL(STRIPE_AGENCY_10);u.searchParams.set("client_reference_id",session?.user?.id||"");u.searchParams.set("prefilled_email",session?.user?.email||"");return u.toString();}catch{return STRIPE_AGENCY_10;}})()}
-                        target="_blank" rel="noreferrer"
-                        style={{display:"block",marginTop:16,textAlign:"center",background:agencyTheme?.plan==="starter"?inp:teal,color:agencyTheme?.plan==="starter"?muted:"#fff",border:agencyTheme?.plan==="starter"?`1px solid ${border}`:"none",borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,textDecoration:"none"}}>
+                      <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email,STRIPE_AGENCY_10)}
+                        style={{display:"block",width:"100%",marginTop:16,textAlign:"center",background:agencyTheme?.plan==="starter"?inp:teal,color:agencyTheme?.plan==="starter"?muted:"#fff",border:agencyTheme?.plan==="starter"?`1px solid ${border}`:"none",borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
                         {agencyTheme?.plan==="starter"?"Plano Actual":"Subscrever Starter"}
-                      </a>
+                      </button>
                     </div>
                     {/* Agency Growth — 20 agentes */}
                     <div style={{borderRadius:14,border:`2px solid ${agencyTheme?.plan==="growth"?teal:border}`,padding:20,position:"relative",background:agencyTheme?.plan==="growth"?`${teal}08`:card}}>
@@ -2804,11 +2824,10 @@ function ImoPro() {
                           <span style={{fontSize:12,color:text}}>{f}</span>
                         </div>
                       ))}
-                      <a href={(()=>{try{const u=new URL(STRIPE_AGENCY_20);u.searchParams.set("client_reference_id",session?.user?.id||"");u.searchParams.set("prefilled_email",session?.user?.email||"");return u.toString();}catch{return STRIPE_AGENCY_20;}})()}
-                        target="_blank" rel="noreferrer"
-                        style={{display:"block",marginTop:16,textAlign:"center",background:agencyTheme?.plan==="growth"?inp:teal,color:agencyTheme?.plan==="growth"?muted:"#fff",border:agencyTheme?.plan==="growth"?`1px solid ${border}`:"none",borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,textDecoration:"none"}}>
+                      <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email,STRIPE_AGENCY_20)}
+                        style={{display:"block",width:"100%",marginTop:16,textAlign:"center",background:agencyTheme?.plan==="growth"?inp:teal,color:agencyTheme?.plan==="growth"?muted:"#fff",border:agencyTheme?.plan==="growth"?`1px solid ${border}`:"none",borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
                         {agencyTheme?.plan==="growth"?"Plano Actual":"Subscrever Growth"}
-                      </a>
+                      </button>
                     </div>
                   </div>
                 </div>

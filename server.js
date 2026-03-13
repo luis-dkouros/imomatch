@@ -19,6 +19,10 @@ const SUPABASE_URL         = process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_ANON_KEY    = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // admin — nunca exposta ao browser
 const SITE_URL             = process.env.REACT_APP_SITE_URL || "https://imomatch.pt";
+const STRIPE_WEBHOOK_SECRET       = process.env.STRIPE_WEBHOOK_SECRET || "";
+const STRIPE_PRICE_AGENCY_STARTER = process.env.STRIPE_PRICE_AGENCY_STARTER || "";  // price_xxx do Agency 10
+const STRIPE_PRICE_AGENCY_GROWTH  = process.env.STRIPE_PRICE_AGENCY_GROWTH  || "";  // price_xxx do Agency 20
+const STRIPE_PRICE_BASIC          = process.env.STRIPE_PRICE_BASIC          || "";  // price_xxx do plano individual
 
 const BUILD_DIR = path.join(__dirname, "build");
 
@@ -387,6 +391,148 @@ app.get("/api/agencies/:slug/properties", async (req, res) => {
 // Body: { agency_id, email, invited_by_jwt }
 // Requer SUPABASE_SERVICE_ROLE_KEY no Railway
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ── Stripe Webhook ───────────────────────────────────────────────────────────
+// IMPORTANTE: este endpoint precisa de raw body (antes do express.json)
+app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+
+  // ── Verificar assinatura (se STRIPE_WEBHOOK_SECRET estiver configurado) ──
+  let event;
+  if (STRIPE_WEBHOOK_SECRET) {
+    // Verificação manual sem SDK Stripe (não está instalado)
+    const crypto = require("crypto");
+    try {
+      const payload = req.body.toString("utf8");
+      const parts = sig.split(",").reduce((acc, p) => {
+        const [k, v] = p.split("=");
+        acc[k] = v;
+        return acc;
+      }, {});
+      const timestamp = parts["t"];
+      const expectedSig = crypto
+        .createHmac("sha256", STRIPE_WEBHOOK_SECRET)
+        .update(`${timestamp}.${payload}`)
+        .digest("hex");
+      if (!parts["v1"] || parts["v1"] !== expectedSig) {
+        console.error("[WEBHOOK] Assinatura inválida");
+        return res.status(400).send("Invalid signature");
+      }
+      event = JSON.parse(payload);
+    } catch (err) {
+      console.error("[WEBHOOK] Erro ao verificar assinatura:", err.message);
+      return res.status(400).send("Webhook error");
+    }
+  } else {
+    // Sem secret configurado — aceitar sem verificação (dev/teste)
+    try { event = JSON.parse(req.body.toString("utf8")); }
+    catch { return res.status(400).send("Invalid JSON"); }
+  }
+
+  console.log(`[WEBHOOK] Evento recebido: ${event.type}`);
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const userId  = session.client_reference_id;  // user.id do Supabase
+    const email   = session.customer_details?.email || session.customer_email;
+    const lineItems = session.display_items || [];
+
+    // Determinar o price_id (vem em line_items — pode precisar de expand)
+    // O Stripe pode não incluir line_items no evento base; usamos metadata como fallback
+    const priceId  = session.metadata?.price_id || "";
+    const planMeta = session.metadata?.plan || "";  // "starter" / "growth" / "basic"
+
+    console.log(`[WEBHOOK] checkout.session.completed | userId=${userId} | email=${email} | priceId=${priceId} | planMeta=${planMeta}`);
+
+    try {
+      // ── Determinar o plano pelo price_id ou metadata ──
+      let agencyPlan = null;
+      if (
+        planMeta === "starter" ||
+        (STRIPE_PRICE_AGENCY_STARTER && priceId === STRIPE_PRICE_AGENCY_STARTER)
+      ) {
+        agencyPlan = "starter";
+      } else if (
+        planMeta === "growth" ||
+        (STRIPE_PRICE_AGENCY_GROWTH && priceId === STRIPE_PRICE_AGENCY_GROWTH)
+      ) {
+        agencyPlan = "growth";
+      }
+
+      if (agencyPlan) {
+        // ══ Plano de AGÊNCIA ══
+        // Atualizar agencies.plan e agencies.active WHERE owner_id = userId
+        if (!userId) {
+          console.error("[WEBHOOK] agencyPlan sem userId");
+          return res.json({ received: true });
+        }
+        const maxUsers = agencyPlan === "growth" ? 20 : 10;
+        const upd = await supabaseRequest({
+          method: "PATCH",
+          path: `/rest/v1/agencies?owner_id=eq.${userId}`,
+          body: { plan: agencyPlan, active: true, max_users: maxUsers },
+          useServiceKey: true,
+          headers: { Prefer: "return=representation" },
+        });
+        console.log(`[WEBHOOK] Agência atualizada para plan=${agencyPlan}:`, upd.status, JSON.stringify(upd.body));
+
+        // Atualizar também o perfil do owner (plan="agency")
+        await supabaseRequest({
+          method: "PATCH",
+          path: `/rest/v1/profiles?id=eq.${userId}`,
+          body: { plan: "agency" },
+          useServiceKey: true,
+        });
+        console.log(`[WEBHOOK] Perfil owner atualizado para plan=agency`);
+
+      } else {
+        // ══ Plano INDIVIDUAL (basic) ══
+        if (!userId) {
+          console.error("[WEBHOOK] basic sem userId");
+          return res.json({ received: true });
+        }
+        const stripeCustomerId = session.customer;
+        const updateBody = { plan: "basic" };
+        if (stripeCustomerId) updateBody.stripe_customer_id = stripeCustomerId;
+
+        const upd = await supabaseRequest({
+          method: "PATCH",
+          path: `/rest/v1/profiles?id=eq.${userId}`,
+          body: updateBody,
+          useServiceKey: true,
+        });
+        console.log(`[WEBHOOK] Perfil individual atualizado para plan=basic:`, upd.status);
+      }
+
+    } catch (err) {
+      console.error("[WEBHOOK] Erro ao processar checkout:", err.message);
+    }
+  }
+
+  if (event.type === "customer.subscription.deleted") {
+    // Cancelamento — reverter plano para pending
+    const customerId = event.data.object.customer;
+    if (customerId) {
+      // Tentar revogar plano individual
+      await supabaseRequest({
+        method: "PATCH",
+        path: `/rest/v1/profiles?stripe_customer_id=eq.${customerId}`,
+        body: { plan: "pending" },
+        useServiceKey: true,
+      }).catch(e => console.error("[WEBHOOK] Erro ao revogar plano individual:", e.message));
+
+      // Tentar revogar plano de agência
+      await supabaseRequest({
+        method: "PATCH",
+        path: `/rest/v1/agencies?stripe_customer_id=eq.${customerId}`,
+        body: { plan: "pending", active: false },
+        useServiceKey: true,
+      }).catch(e => console.error("[WEBHOOK] Erro ao revogar plano agência:", e.message));
+    }
+  }
+
+  res.json({ received: true });
+});
 
 app.use(express.json());
 
