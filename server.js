@@ -498,7 +498,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       const patchRes = await supabaseRequest({
         method: "PATCH",
         path:   `/rest/v1/profiles?id=eq.${userId}`,
-        body:   { agency_id, agency_role: "agent", plan: "agency" },
+        body:   { agency_id, agency_role: "agent", plan: "agency", needs_set_password: true },
         useServiceKey: true,
         extraHeaders:  { Prefer: "return=representation" },
       });
@@ -548,12 +548,12 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       userId = createRes.body?.id;
       console.log(`[INVITE] Nova conta criada para ${email} (${userId})`);
 
-      // Actualizar perfil com dados da agência (o trigger cria o perfil básico, nós actualizamos)
+      // Actualizar perfil com dados da agência + flag para definir senha
       await new Promise(r => setTimeout(r, 500)); // aguardar trigger
       const newPatchRes = await supabaseRequest({
         method: "PATCH",
         path:   `/rest/v1/profiles?id=eq.${userId}`,
-        body:   { agency_id, agency_role: "agent", plan: "agency" },
+        body:   { agency_id, agency_role: "agent", plan: "agency", needs_set_password: true },
         useServiceKey: true,
         extraHeaders:  { Prefer: "return=representation" },
       });

@@ -1028,6 +1028,10 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
         if (!signInErr) break;
       }
       if (signInErr) { setPassSet(true); setLoading(false); return; }
+      // Limpar o flag needs_set_password
+      if (signInData?.user?.id) {
+        await supabase.from("profiles").update({ needs_set_password: false }).eq("id", signInData.user.id);
+      }
       onDone(signInData?.session);
     } catch(e) {
       setError("Erro de ligação. Tenta novamente.");
@@ -2126,6 +2130,8 @@ function ImoPro() {
       const {data:ag} = await supabase.from("agencies").select("id,name,slug,logo_url,primary_color,secondary_color,plan,max_users").eq("id",data.agency_id).single();
       if(ag) setAgencyTheme(ag);
     }
+    // Agente convidado que ainda não definiu senha
+    if(data?.needs_set_password) setShowSetPassword(true);
   };
 
   const loadContacts = async()=>{
