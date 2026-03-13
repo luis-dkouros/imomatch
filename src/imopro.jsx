@@ -983,44 +983,16 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const [error,      setError]      = useState("");
   const [showP,      setShowP]      = useState(false);
   const [showC,      setShowC]      = useState(false);
-  const [localEmail, setLocalEmail] = useState(session?.user?.email || null);
-
-  // Polling à sessão — o token do link é processado de forma assíncrona pelo Supabase
-  // Não depende de eventos: verifica directamente até ter email ou timeout (5s)
-  useEffect(() => {
-    if (localEmail) return;
-    let tries = 0;
-    const poll = setInterval(async () => {
-      tries++;
-      const { data } = await supabase.auth.getSession();
-      if (data?.session?.user?.email) {
-        setLocalEmail(data.session.user.email);
-        clearInterval(poll);
-      } else if (tries >= 10) {
-        clearInterval(poll);
-      }
-    }, 500);
-    return () => clearInterval(poll);
-  }, []);
+  // session vem do pai via PASSWORD_RECOVERY — já está garantidamente disponível
+  const userEmail = session?.user?.email || null;
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
-
-  // Loading enquanto aguarda sessão (máx 5s)
-  if (!localEmail) return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif" }}>
-      <div style={{ textAlign:"center", color:muted }}>
-        <div style={{ fontSize:32, marginBottom:12 }}>⏳</div>
-        <div style={{ fontSize:14 }}>A preparar o teu acesso...</div>
-      </div>
-    </div>
-  );
 
   const handleSubmit = async () => {
     if (pass.length < 6) { setError("A senha deve ter pelo menos 6 caracteres."); return; }
     if (pass !== confirm) { setError("As senhas não coincidem."); return; }
     setLoading(true); setError("");
     // Obter email da sessão actual (pode ser session ou via getSession)
-    const userEmail = localEmail;
     if (!userEmail) {
       setError("Sessão inválida. Por favor usa o link do email novamente.");
       setLoading(false);
@@ -1950,7 +1922,7 @@ function ImoPro() {
   const [profile,   setProfile]   = useState(null);
   const [agencyTheme, setAgencyTheme] = useState(null); // cores/dados da agência do agente
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showSetPassword, setShowSetPassword]   = useState(() => new URLSearchParams(window.location.search).get("welcome") === "agency");
+  const [showSetPassword, setShowSetPassword]   = useState(false); // activado pelo evento PASSWORD_RECOVERY do Supabase
   const [selectedProps, setSelectedProps] = useState([]);
   const [selectedContacts, setSelectedContacts] = useState([]);
   const [confirmDeleteContacts, setConfirmDeleteContacts] = useState(false);
@@ -1991,8 +1963,13 @@ function ImoPro() {
   // ── Auth listener ──
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>setSession(session));
-    const {data:{subscription}} = supabase.auth.onAuthStateChange((_,session)=>{
+    const {data:{subscription}} = supabase.auth.onAuthStateChange((event, session)=>{
       setSession(session);
+      if(event === "PASSWORD_RECOVERY") {
+        // Agente veio do link de convite — mostrar ecrã de definir senha
+        setShowSetPassword(true);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
       if(!session){ setContacts([]); setProperties([]); setProfile(null); }
     });
     return ()=>subscription.unsubscribe();
@@ -2006,26 +1983,7 @@ function ImoPro() {
     loadProperties();
   },[session]);
 
-  // ── Handle convite de agência (?welcome=agency) ──
-  useEffect(()=>{
-    if(!showSetPassword || !session) return;
-    window.history.replaceState({},"",window.location.pathname);
-    // Polling até plan=agency estar na BD
-    let tries = 0;
-    const poll = setInterval(async () => {
-      tries++;
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
-      if (data?.plan === "agency" || tries >= 10) {
-        clearInterval(poll);
-        if (data) setProfile(data);
-      }
-    }, 1000);
-    return () => clearInterval(poll);
-  },[showSetPassword, session]);
+  // (handler welcome=agency removido — usa evento PASSWORD_RECOVERY)
 
   // ── Handle Stripe return (?payment=success) ──
   useEffect(()=>{

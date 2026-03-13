@@ -571,9 +571,9 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         method: "POST",
         path:   "/auth/v1/admin/generate_link",
         body: {
-          type:  "invite",
+          type:  "recovery",
           email,
-          options: { redirect_to: `${SITE_URL}/?welcome=agency` },
+          options: { redirect_to: `${SITE_URL}/?set-password=1` },
         },
         useServiceKey: true,
       });
@@ -581,7 +581,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       // O link está em properties.action_link
       const actionLink = linkRes.body?.properties?.action_link
         || linkRes.body?.action_link
-        || `${SITE_URL}/?welcome=agency`;
+        || `${SITE_URL}/?set-password=1`;
 
       await fetch("https://api.resend.com/emails", {
         method: "POST",
