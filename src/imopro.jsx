@@ -983,28 +983,17 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const [error,      setError]      = useState("");
   const [showP,      setShowP]      = useState(false);
   const [showC,      setShowC]      = useState(false);
-  const [localEmail,    setLocalEmail]    = useState(session?.user?.email || null);
+  const [localEmail,     setLocalEmail]     = useState(session?.user?.email || null);
   const [waitingSession, setWaitingSession] = useState(!session?.user?.email);
 
-  // Escutar auth state — o token do link é processado de forma assíncrona
-  // Não podemos depender apenas do getSession() porque pode correr antes do token ser processado
+  // O evento onAuthStateChange já foi consumido pelo pai.
+  // Basta observar a prop session — quando o pai actualizar, o efeito dispara.
   useEffect(() => {
-    // Tentar imediatamente
-    supabase.auth.getSession().then(({ data }) => {
-      if (data?.session?.user?.email) {
-        setLocalEmail(data.session.user.email);
-        setWaitingSession(false);
-      }
-    });
-    // E escutar mudanças (para quando o token do link é processado)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
-      if (s?.user?.email) {
-        setLocalEmail(s.user.email);
-        setWaitingSession(false);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+    if (session?.user?.email) {
+      setLocalEmail(session.user.email);
+      setWaitingSession(false);
+    }
+  }, [session]);
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
 
