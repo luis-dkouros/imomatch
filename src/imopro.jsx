@@ -983,10 +983,19 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const [error,      setError]      = useState("");
   const [showP,      setShowP]      = useState(false);
   const [showC,      setShowC]      = useState(false);
-  // session vem do pai via PASSWORD_RECOVERY — já está garantidamente disponível
   const userEmail = session?.user?.email || null;
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
+
+  // Aguardar sessão — o Supabase processa o token de forma assíncrona
+  if (!userEmail) return (
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif" }}>
+      <div style={{ textAlign:"center", color:muted }}>
+        <div style={{ fontSize:32, marginBottom:12 }}>🔐</div>
+        <div style={{ fontSize:14 }}>A preparar o teu acesso...</div>
+      </div>
+    </div>
+  );
 
   const handleSubmit = async () => {
     if (pass.length < 6) { setError("A senha deve ter pelo menos 6 caracteres."); return; }
@@ -1922,7 +1931,7 @@ function ImoPro() {
   const [profile,   setProfile]   = useState(null);
   const [agencyTheme, setAgencyTheme] = useState(null); // cores/dados da agência do agente
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showSetPassword, setShowSetPassword]   = useState(false); // activado pelo evento PASSWORD_RECOVERY do Supabase
+  const [showSetPassword, setShowSetPassword]   = useState(() => new URLSearchParams(window.location.search).get("set-password") === "1");
   const [selectedProps, setSelectedProps] = useState([]);
   const [selectedContacts, setSelectedContacts] = useState([]);
   const [confirmDeleteContacts, setConfirmDeleteContacts] = useState(false);
@@ -1965,10 +1974,13 @@ function ImoPro() {
     supabase.auth.getSession().then(({data:{session}})=>setSession(session));
     const {data:{subscription}} = supabase.auth.onAuthStateChange((event, session)=>{
       setSession(session);
-      if(event === "PASSWORD_RECOVERY") {
-        // Agente veio do link de convite — mostrar ecrã de definir senha
-        setShowSetPassword(true);
-        window.history.replaceState({}, "", window.location.pathname);
+      if(event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        // Se o URL tinha ?set-password=1, manter showSetPassword activo
+        const params = new URLSearchParams(window.location.search);
+        if(params.get("set-password") === "1") {
+          setShowSetPassword(true);
+          window.history.replaceState({}, "", window.location.pathname);
+        }
       }
       if(!session){ setContacts([]); setProperties([]); setProfile(null); }
     });
