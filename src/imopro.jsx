@@ -983,17 +983,40 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const [error,      setError]      = useState("");
   const [showP,      setShowP]      = useState(false);
   const [showC,      setShowC]      = useState(false);
-  const [localEmail, setLocalEmail] = useState(session?.user?.email || null);
+  const [localEmail,    setLocalEmail]    = useState(session?.user?.email || null);
+  const [waitingSession, setWaitingSession] = useState(!session?.user?.email);
 
-  // Obter sessão directamente no mount — não depender do estado React que pode ainda não ter actualizado
+  // Escutar auth state — o token do link é processado de forma assíncrona
+  // Não podemos depender apenas do getSession() porque pode correr antes do token ser processado
   useEffect(() => {
-    if (localEmail) return;
+    // Tentar imediatamente
     supabase.auth.getSession().then(({ data }) => {
-      if (data?.session?.user?.email) setLocalEmail(data.session.user.email);
+      if (data?.session?.user?.email) {
+        setLocalEmail(data.session.user.email);
+        setWaitingSession(false);
+      }
     });
+    // E escutar mudanças (para quando o token do link é processado)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (s?.user?.email) {
+        setLocalEmail(s.user.email);
+        setWaitingSession(false);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
+
+  // Mostrar loading enquanto aguarda sessão do Supabase
+  if (waitingSession) return (
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif" }}>
+      <div style={{ textAlign:"center", color:muted }}>
+        <div style={{ fontSize:32, marginBottom:12 }}>⏳</div>
+        <div style={{ fontSize:14 }}>A preparar o teu acesso...</div>
+      </div>
+    </div>
+  );
 
   const handleSubmit = async () => {
     if (pass.length < 6) { setError("A senha deve ter pelo menos 6 caracteres."); return; }
