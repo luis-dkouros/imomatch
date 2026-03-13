@@ -649,14 +649,17 @@ app.post("/api/agencies/set-initial-password", async (req, res) => {
   if (password.length < 6) return res.status(400).json({ error: "Password deve ter mínimo 6 caracteres." });
 
   try {
-    // Verificar que este email existe e tem plan=agency (é realmente um agente convidado)
+    // Procurar o utilizador pelo email — admin/users não filtra por email, precisamos de iterar
+    // Usar a tabela de identities do Supabase que tem email indexado
     const usersRes = await supabaseRequest({
       method: "GET",
-      path: `/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+      path: `/auth/v1/admin/users?page=1&per_page=1000`,
       useServiceKey: true,
     });
-    const user = usersRes.body?.users?.[0];
+    const allUsers = usersRes.body?.users || [];
+    const user = allUsers.find(u => u.email?.toLowerCase() === email.toLowerCase().trim());
     if (!user) return res.status(404).json({ error: "Email não encontrado." });
+    console.log(`[SET-PASSWORD] Utilizador encontrado: ${user.email} (${user.id})`);
 
     const profileRes = await supabaseRequest({
       method: "GET",
