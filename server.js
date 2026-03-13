@@ -498,7 +498,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       const patchRes = await supabaseRequest({
         method: "PATCH",
         path:   `/rest/v1/profiles?id=eq.${userId}`,
-        body:   { agency_id, agency_role: "member", plan: "agency" },
+        body:   { agency_id, agency_role: "agent", plan: "agency" },
         useServiceKey: true,
         extraHeaders:  { Prefer: "return=representation" },
       });
@@ -511,7 +511,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         const upsertRes = await supabaseRequest({
           method: "POST",
           path:   "/rest/v1/profiles",
-          body:   { id: userId, name: email.split("@")[0], agency_id, agency_role: "member", plan: "agency" },
+          body:   { id: userId, name: email.split("@")[0], agency_id, agency_role: "agent", plan: "agency" },
           useServiceKey: true,
           extraHeaders:  { Prefer: "return=representation,resolution=merge-duplicates" },
         });
@@ -553,12 +553,15 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       const newPatchRes = await supabaseRequest({
         method: "PATCH",
         path:   `/rest/v1/profiles?id=eq.${userId}`,
-        body:   { agency_id, agency_role: "member", plan: "agency" },
+        body:   { agency_id, agency_role: "agent", plan: "agency" },
         useServiceKey: true,
         extraHeaders:  { Prefer: "return=representation" },
       });
       console.log(`[INVITE] Perfil actualizado: ${newPatchRes.status}`, JSON.stringify(newPatchRes.body));
     }
+
+    // Aguardar propagação antes de gerar link (necessário para contas novas)
+    await new Promise(r => setTimeout(r, 1500));
 
     // Limpar convite pendente se existia
     await supabaseRequest({
