@@ -998,8 +998,9 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
-  const [showP,   setShowP]   = useState(false);
-  const [showC,   setShowC]   = useState(false);
+  const [showP,      setShowP]      = useState(false);
+  const [showC,      setShowC]      = useState(false);
+  const [passSet,    setPassSet]    = useState(false); // senha definida, pronto para login
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
   const LBL = { display:"block", fontSize:11, fontWeight:700, color:muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.06em" };
@@ -1026,7 +1027,7 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
         signInData = result.data;
         if (!signInErr) break;
       }
-      if (signInErr) { setError("Senha definida com sucesso! Clica em 'Entrar' abaixo."); setLoading(false); return; }
+      if (signInErr) { setPassSet(true); setLoading(false); return; }
       onDone(signInData?.session);
     } catch(e) {
       setError("Erro de ligação. Tenta novamente.");
@@ -1069,10 +1070,21 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
               ))}
             </div>
           )}
-          <button onClick={handleSubmit} disabled={loading||!pass||!confirm||!email}
-            style={{ background:teal, color:"#fff", border:"none", borderRadius:10, padding:"13px", fontWeight:700, fontSize:15, cursor:"pointer", fontFamily:"inherit", opacity:(!pass||!confirm||!email)?0.6:1, marginTop:4 }}>
-            {loading ? "A guardar..." : "Definir senha e entrar →"}
-          </button>
+          {passSet ? (
+            <button onClick={async()=>{
+              setLoading(true);
+              const {data,error} = await supabase.auth.signInWithPassword({email:email.trim(),password:pass});
+              if(error){ setError("Erro ao entrar: "+error.message); setLoading(false); return; }
+              onDone(data?.session);
+            }} style={{ background:teal, color:"#fff", border:"none", borderRadius:10, padding:"13px", fontWeight:700, fontSize:15, cursor:"pointer", fontFamily:"inherit", marginTop:4 }}>
+              {loading ? "A entrar..." : "✓ Senha definida — Entrar agora →"}
+            </button>
+          ) : (
+            <button onClick={handleSubmit} disabled={loading||!pass||!confirm||!email}
+              style={{ background:teal, color:"#fff", border:"none", borderRadius:10, padding:"13px", fontWeight:700, fontSize:15, cursor:"pointer", fontFamily:"inherit", opacity:(!pass||!confirm||!email)?0.6:1, marginTop:4 }}>
+              {loading ? "A guardar..." : "Definir senha e entrar →"}
+            </button>
+          )}
         </div>
         <div style={{ textAlign:"center", marginTop:20, fontSize:12, color:muted }}>A tua senha é privada e segura.</div>
       </div>
