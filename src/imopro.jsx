@@ -987,12 +987,23 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
 
-  // Aguardar sessão — o Supabase processa o token de forma assíncrona
+  // Debug: mostrar estado actual
+  const [debugInfo, setDebugInfo] = useState("A iniciar...");
+  useEffect(() => {
+    let info = `session: ${session === undefined ? "undefined" : session === null ? "null" : "OK"} | email: ${session?.user?.email || "none"}`;
+    setDebugInfo(info);
+    // Também tentar getSession directamente
+    supabase.auth.getSession().then(({data}) => {
+      setDebugInfo(prev => prev + " | getSession: " + (data?.session?.user?.email || "null"));
+    });
+  }, [session]);
+
   if (!userEmail) return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif" }}>
-      <div style={{ textAlign:"center", color:muted }}>
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif", padding:20 }}>
+      <div style={{ textAlign:"center", color:muted, maxWidth:340 }}>
         <div style={{ fontSize:32, marginBottom:12 }}>🔐</div>
-        <div style={{ fontSize:14 }}>A preparar o teu acesso...</div>
+        <div style={{ fontSize:14, marginBottom:16 }}>A preparar o teu acesso...</div>
+        <div style={{ fontSize:11, background:"#0001", borderRadius:8, padding:"8px 12px", wordBreak:"break-all", textAlign:"left" }}>{debugInfo}</div>
       </div>
     </div>
   );
