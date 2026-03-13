@@ -280,7 +280,13 @@ export default function AgencyPanel({ supabase, session, profile, dark, onNotif 
   const removeAgent = async (memberId) => {
     if (!window.confirm("Remover este agente da agência?\nO plano volta a 'pending'.")) return;
     try {
-      await sbPatch(`profiles?id=eq.${memberId}`, { agency_id: null, agency_role: null, plan: "pending" }, jwt);
+      const r = await fetch("/api/agencies/remove-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member_id: memberId, agency_id: profile.agency_id }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Erro desconhecido");
       onNotif("Agente removido.");
       loadAgency();
     } catch (e) {

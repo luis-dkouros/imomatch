@@ -716,6 +716,27 @@ app.post("/api/agencies/set-initial-password", async (req, res) => {
   }
 });
 
+
+// ── Remover agente da agência ────────────────────────────────────────────────
+app.post("/api/agencies/remove-agent", async (req, res) => {
+  const { member_id, agency_id } = req.body || {};
+  if (!member_id || !agency_id) return res.status(400).json({ error: "member_id e agency_id são obrigatórios." });
+  try {
+    const r = await supabaseRequest({
+      method: "PATCH",
+      path:   `/rest/v1/profiles?id=eq.${member_id}&agency_id=eq.${agency_id}`,
+      body:   { agency_id: null, agency_role: null, plan: "pending" },
+      useServiceKey: true,
+      extraHeaders: { Prefer: "return=representation" },
+    });
+    console.log(`[REMOVE-AGENT] ${member_id} removido da agência ${agency_id}: ${r.status}`);
+    if (r.status === 200 || r.status === 204) return res.json({ ok: true });
+    return res.status(500).json({ error: "Erro ao remover: " + JSON.stringify(r.body) });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`✅ ImoPro server running on port ${PORT}`);
   console.log(`   SITE_URL: ${SITE_URL}`);
