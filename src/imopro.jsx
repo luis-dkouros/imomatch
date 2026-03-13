@@ -1499,6 +1499,8 @@ const STRIPE_LINK_30D=process.env.REACT_APP_STRIPE_LINK_30D||"https://buy.stripe
 const META_APP_ID=process.env.REACT_APP_META_APP_ID||"1558755848548021";
 const META_REDIRECT=process.env.REACT_APP_META_REDIRECT||"https://www.imomatch.pt/auth/facebook/callback";
 const STRIPE_PORTAL=process.env.REACT_APP_STRIPE_PORTAL||"https://billing.stripe.com/p/login/YOUR_PORTAL_LINK";
+const STRIPE_AGENCY_10=process.env.REACT_APP_STRIPE_AGENCY_10||"https://buy.stripe.com/aFacN593CeAY6Dr9xYcfK02";
+const STRIPE_AGENCY_20=process.env.REACT_APP_STRIPE_AGENCY_20||"https://buy.stripe.com/3cIcN55Rq1Ocd1P25wcfK03";
 function openStripeCheckout(userId, email, link) {
   const base = link || STRIPE_LINK;
   const url = new URL(base);
@@ -2175,7 +2177,8 @@ function ImoPro() {
 
   const userPlan=(profile?.plan||"pending").toLowerCase();
   const isBasic   = userPlan==="basic";
-  const isAgency  = userPlan==="agency" || profile?.agency_role==="owner" || profile?.agency_role==="admin";  // owner, admin ou agente
+  const isAgency      = userPlan==="agency" || profile?.agency_role==="owner" || profile?.agency_role==="admin";  // owner, admin ou agente
+  const isOwnerAgency = profile?.agency_role==="owner" || profile?.agency_role==="admin";  // gere a agência
   const isPending = userPlan==="pending" || userPlan==="expired" || userPlan==="past_due";
   const isTrialActive = false;
   const trialDaysLeft = 0;
@@ -2733,6 +2736,86 @@ function ImoPro() {
 
             {/* BILLING */}
             {page==="billing"&&<div>
+
+              {/* ── BILLING AGÊNCIA (owner/admin) ── */}
+              {isOwnerAgency&&<>
+                {/* Banner plano actual */}
+                <div style={{...CARD,marginBottom:20,background:`${teal}11`,border:`1px solid ${teal}`,borderRadius:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                        <span style={{fontSize:22}}>🏢</span>
+                        <div style={{fontSize:20,fontWeight:800,color:text}}>
+                          {agencyTheme?.plan==="growth"?"Agência Growth":"Agência Starter"}
+                        </div>
+                        <div style={{background:teal,color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>ACTIVO</div>
+                      </div>
+                      <div style={{fontSize:13,color:muted}}>
+                        {agencyTheme?.plan==="growth"
+                          ?"Até 20 agentes incluídos — acesso completo para toda a equipa."
+                          :"Até 10 agentes incluídos — acesso completo para toda a equipa."}
+                      </div>
+                    </div>
+                    <button onClick={()=>window.open(STRIPE_PORTAL,"_blank")}
+                      style={{background:inp,color:muted,border:`1px solid ${border}`,borderRadius:8,padding:"9px 16px",fontWeight:600,cursor:"pointer",fontSize:13,fontFamily:"inherit",whiteSpace:"nowrap"}}>
+                      Gerir Subscrição
+                    </button>
+                  </div>
+                </div>
+
+                {/* Planos agência */}
+                <div style={{...CARD,borderRadius:16,marginBottom:20}}>
+                  <div style={{fontSize:14,fontWeight:700,color:text,marginBottom:16}}>🏢 Planos para Agências</div>
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:14}}>
+                    {/* Agency Starter — 10 agentes */}
+                    <div style={{borderRadius:14,border:`2px solid ${agencyTheme?.plan==="starter"?teal:border}`,padding:20,position:"relative",background:agencyTheme?.plan==="starter"?`${teal}08`:card}}>
+                      {agencyTheme?.plan==="starter"&&<div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>✓ PLANO ACTUAL</div>}
+                      <div style={{fontSize:15,fontWeight:700,color:text,marginBottom:4}}>Agency Starter</div>
+                      <div style={{fontSize:12,color:muted,marginBottom:12}}>Até 10 agentes</div>
+                      <div style={{display:"flex",alignItems:"baseline",gap:3,marginBottom:16}}>
+                        <span style={{fontSize:28,fontWeight:800,color:teal}}>29€</span>
+                        <span style={{fontSize:12,color:muted}}>/mês</span>
+                      </div>
+                      {["10 agentes incluídos","Painel de equipa","Tema e cores da agência","Landing pages por agente","Suporte prioritário"].map((f,i)=>(
+                        <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                          <span style={{color:"#10b981",fontWeight:700,fontSize:13}}>✓</span>
+                          <span style={{fontSize:12,color:text}}>{f}</span>
+                        </div>
+                      ))}
+                      <a href={(()=>{try{const u=new URL(STRIPE_AGENCY_10);u.searchParams.set("client_reference_id",session?.user?.id||"");u.searchParams.set("prefilled_email",session?.user?.email||"");return u.toString();}catch{return STRIPE_AGENCY_10;}})()}
+                        target="_blank" rel="noreferrer"
+                        style={{display:"block",marginTop:16,textAlign:"center",background:agencyTheme?.plan==="starter"?inp:teal,color:agencyTheme?.plan==="starter"?muted:"#fff",border:agencyTheme?.plan==="starter"?`1px solid ${border}`:"none",borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,textDecoration:"none"}}>
+                        {agencyTheme?.plan==="starter"?"Plano Actual":"Subscrever Starter"}
+                      </a>
+                    </div>
+                    {/* Agency Growth — 20 agentes */}
+                    <div style={{borderRadius:14,border:`2px solid ${agencyTheme?.plan==="growth"?teal:border}`,padding:20,position:"relative",background:agencyTheme?.plan==="growth"?`${teal}08`:card}}>
+                      {agencyTheme?.plan!=="growth"&&<div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:"#f59e0b",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>⭐ RECOMENDADO</div>}
+                      {agencyTheme?.plan==="growth"&&<div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>✓ PLANO ACTUAL</div>}
+                      <div style={{fontSize:15,fontWeight:700,color:text,marginBottom:4}}>Agency Growth</div>
+                      <div style={{fontSize:12,color:muted,marginBottom:12}}>Até 20 agentes</div>
+                      <div style={{display:"flex",alignItems:"baseline",gap:3,marginBottom:16}}>
+                        <span style={{fontSize:28,fontWeight:800,color:teal}}>49€</span>
+                        <span style={{fontSize:12,color:muted}}>/mês</span>
+                      </div>
+                      {["20 agentes incluídos","Tudo do Starter","Suporte prioritário","Funcionalidades Pro futuras"].map((f,i)=>(
+                        <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                          <span style={{color:"#10b981",fontWeight:700,fontSize:13}}>✓</span>
+                          <span style={{fontSize:12,color:text}}>{f}</span>
+                        </div>
+                      ))}
+                      <a href={(()=>{try{const u=new URL(STRIPE_AGENCY_20);u.searchParams.set("client_reference_id",session?.user?.id||"");u.searchParams.set("prefilled_email",session?.user?.email||"");return u.toString();}catch{return STRIPE_AGENCY_20;}})()}
+                        target="_blank" rel="noreferrer"
+                        style={{display:"block",marginTop:16,textAlign:"center",background:agencyTheme?.plan==="growth"?inp:teal,color:agencyTheme?.plan==="growth"?muted:"#fff",border:agencyTheme?.plan==="growth"?`1px solid ${border}`:"none",borderRadius:10,padding:"11px",fontWeight:700,fontSize:13,textDecoration:"none"}}>
+                        {agencyTheme?.plan==="growth"?"Plano Actual":"Subscrever Growth"}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </>}
+
+              {/* ── BILLING INDIVIDUAL (não owner de agência) ── */}
+              {!isOwnerAgency&&<>
               {/* Current Plan Banner */}
               <div style={{...CARD,marginBottom:20,background:isBasic?`${teal}11`:card,border:`1px solid ${isBasic?teal:border}`,borderRadius:16}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
@@ -2743,12 +2826,12 @@ function ImoPro() {
                       <div style={{background:hasAccess?teal:"#ef4444",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{isBasic?"ACTIVO":isAgency?"ACTIVO":"SEM SUBSCRIÇÃO"}</div>
                     </div>
                     <div style={{fontSize:13,color:muted}}>
-                      {isBasic?"Acesso completo a todas as funcionalidades.":"Subscreve o plano Basic para aceder a todas as funcionalidades."}
+                      {isBasic?"Acesso completo a todas as funcionalidades.":isAgency?"O teu acesso está incluído no plano da agência.":"Subscreve o plano Basic para aceder a todas as funcionalidades."}
                     </div>
                   </div>
                   {isBasic?(
                     <button onClick={()=>window.open(STRIPE_PORTAL,"_blank")} style={{background:inp,color:muted,border:`1px solid ${border}`,borderRadius:8,padding:"9px 16px",fontWeight:600,cursor:"pointer",fontSize:13,fontFamily:"inherit",whiteSpace:"nowrap"}}>Gerir Subscrição</button>
-                  ):(
+                  ):isAgency?null:(
                     <button onClick={()=>openStripeCheckout(session?.user?.id,session?.user?.email)} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"10px 20px",fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit",whiteSpace:"nowrap"}}>⬆ Subscrever Basic</button>
                   )}
                 </div>
@@ -2825,6 +2908,7 @@ function ImoPro() {
                   </div>
                 ))}
               </div>
+            </>}
             </div>}
 
             {/* AJUDA */}
