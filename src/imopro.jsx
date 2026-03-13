@@ -982,6 +982,7 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
 
 
 // ── Ecrã de definir senha (agentes convidados) ────────────────────────────────
+
 function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const teal  = "#3BB2A1";
   const bg    = dark ? "#0f172a" : "#f1f5f9";
@@ -992,131 +993,67 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const inpB  = dark ? "#334155" : "#e2e8f0";
   const border= dark ? "#334155" : "#e2e8f0";
 
-  const [pass,       setPass]       = useState("");
-  const [confirm,    setConfirm]    = useState("");
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState("");
-  const [showP,      setShowP]      = useState(false);
-  const [showC,      setShowC]      = useState(false);
-  const [userEmail, setUserEmail] = useState(session?.user?.email || null);
-  const [sessionReady, setSessionReady] = useState(!!session?.user?.email);
-
-  useEffect(() => {
-    if (userEmail) return;
-    // Tentar criar sessão a partir dos tokens capturados do hash
-    const tokens = window._inviteTokens;
-    if (tokens) {
-      supabase.auth.setSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token })
-        .then(({ data, error }) => {
-          if (data?.session?.user?.email) {
-            setUserEmail(data.session.user.email);
-            setSessionReady(true);
-            delete window._inviteTokens;
-          }
-        });
-      return;
-    }
-    // Fallback: polling ao getSession (caso o Supabase já tenha processado)
-    let tries = 0;
-    const poll = setInterval(async () => {
-      tries++;
-      const { data } = await supabase.auth.getSession();
-      if (data?.session?.user?.email) {
-        setUserEmail(data.session.user.email);
-        setSessionReady(true);
-        clearInterval(poll);
-      } else if (tries >= 6) {
-        clearInterval(poll);
-        setSessionReady(true); // mostrar erro em vez de loading infinito
-      }
-    }, 500);
-    return () => clearInterval(poll);
-  }, [session]);
-
-  // Quando sessão chega via prop do pai
-  useEffect(() => {
-    if (session?.user?.email && !userEmail) {
-      setUserEmail(session.user.email);
-      setSessionReady(true);
-    }
-  }, [session]);
+  const [email,   setEmail]   = useState(session?.user?.email || "");
+  const [pass,    setPass]    = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const [showP,   setShowP]   = useState(false);
+  const [showC,   setShowC]   = useState(false);
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
-
-  if (!sessionReady) return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif" }}>
-      <div style={{ textAlign:"center", color:muted }}>
-        <div style={{ fontSize:32, marginBottom:12 }}>🔐</div>
-        <div style={{ fontSize:14 }}>A preparar o teu acesso...</div>
-      </div>
-    </div>
-  );
+  const LBL = { display:"block", fontSize:11, fontWeight:700, color:muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.06em" };
 
   const handleSubmit = async () => {
+    if (!email.trim())   { setError("Introduz o teu email."); return; }
     if (pass.length < 6) { setError("A senha deve ter pelo menos 6 caracteres."); return; }
     if (pass !== confirm) { setError("As senhas não coincidem."); return; }
     setLoading(true); setError("");
-    // Obter email da sessão actual (pode ser session ou via getSession)
-    if (!userEmail) {
-      setError("Sessão inválida. Por favor usa o link do email novamente.");
+    try {
+      const res = await fetch("/api/agencies/set-initial-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password: pass }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Erro ao definir senha."); setLoading(false); return; }
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
+      if (signInErr) { setError("Senha definida! Entra com o teu email e senha."); setLoading(false); return; }
+      onDone(null);
+    } catch(e) {
+      setError("Erro de ligação. Tenta novamente.");
       setLoading(false);
-      return;
     }
-    // Definir a senha
-    const { error: err } = await supabase.auth.updateUser({ password: pass });
-    if (err) { setError("Erro ao definir senha: " + err.message); setLoading(false); return; }
-    // updateUser invalida a sessão — entrar automaticamente com a nova senha
-    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-      email:    userEmail,
-      password: pass,
-    });
-    if (signInErr) { setError("Senha definida! Agora entra com o teu email e senha."); setLoading(false); return; }
-    onDone(signInData?.session);
   };
 
   return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", padding:20, fontFamily:"Inter,sans-serif" }}>
       <div style={{ background:card, border:`1px solid ${border}`, borderRadius:20, padding:36, width:"100%", maxWidth:420, boxShadow:"0 8px 40px rgba(0,0,0,0.1)" }}>
         <div style={{ textAlign:"center", marginBottom:28 }}>
           <div style={{ fontSize:40, marginBottom:12 }}>🔐</div>
           <div style={{ fontSize:22, fontWeight:800, color:text, marginBottom:8 }}>Define a tua senha</div>
-          <div style={{ fontSize:14, color:muted, lineHeight:1.5 }}>
-            Para acederes ao ImoMatch nas próximas vezes,<br/>define uma senha pessoal agora.
-          </div>
+          <div style={{ fontSize:14, color:muted, lineHeight:1.5 }}>Para acederes ao ImoMatch nas próximas vezes,<br/>define uma senha pessoal agora.</div>
         </div>
-
-        {error && (
-          <div style={{ background:"#ef444411", border:"1px solid #ef444433", borderRadius:8, padding:"10px 14px", color:"#ef4444", fontSize:13, marginBottom:16 }}>
-            {error}
-          </div>
-        )}
-
+        {error && <div style={{ background:"#ef444411", border:"1px solid #ef444433", borderRadius:8, padding:"10px 14px", color:"#ef4444", fontSize:13, marginBottom:16 }}>{error}</div>}
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
           <div>
-            <label style={{ display:"block", fontSize:11, fontWeight:700, color:muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.06em" }}>Nova Senha</label>
+            <label style={LBL}>O teu email</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@exemplo.com" style={INP}/>
+          </div>
+          <div>
+            <label style={LBL}>Nova Senha</label>
             <div style={{ position:"relative" }}>
-              <input type={showP?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)}
-                placeholder="Mínimo 6 caracteres" style={INP}/>
-              <button onClick={()=>setShowP(v=>!v)}
-                style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:muted, cursor:"pointer", padding:0, fontSize:16 }}>
-                {showP?"🙈":"👁️"}
-              </button>
+              <input type={showP?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} placeholder="Mínimo 6 caracteres" style={INP}/>
+              <button onClick={()=>setShowP(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:muted, cursor:"pointer", padding:0, fontSize:16 }}>{showP?"🙈":"👁️"}</button>
             </div>
           </div>
           <div>
-            <label style={{ display:"block", fontSize:11, fontWeight:700, color:muted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.06em" }}>Confirmar Senha</label>
+            <label style={LBL}>Confirmar Senha</label>
             <div style={{ position:"relative" }}>
-              <input type={showC?"text":"password"} value={confirm} onChange={e=>setConfirm(e.target.value)}
-                onKeyDown={e=>e.key==="Enter"&&handleSubmit()}
-                placeholder="Repete a senha" style={INP}/>
-              <button onClick={()=>setShowC(v=>!v)}
-                style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:muted, cursor:"pointer", padding:0, fontSize:16 }}>
-                {showC?"🙈":"👁️"}
-              </button>
+              <input type={showC?"text":"password"} value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSubmit()} placeholder="Repete a senha" style={INP}/>
+              <button onClick={()=>setShowC(v=>!v)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:muted, cursor:"pointer", padding:0, fontSize:16 }}>{showC?"🙈":"👁️"}</button>
             </div>
           </div>
-
-          {/* Indicador de força */}
           {pass.length > 0 && (
             <div style={{ display:"flex", gap:4 }}>
               {[1,2,3,4].map(i=>(
@@ -1124,16 +1061,12 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
               ))}
             </div>
           )}
-
-          <button onClick={handleSubmit} disabled={loading||!pass||!confirm}
-            style={{ background:teal, color:"#fff", border:"none", borderRadius:10, padding:"13px", fontWeight:700, fontSize:15, cursor:"pointer", fontFamily:"inherit", opacity:(!pass||!confirm)?0.6:1, marginTop:4 }}>
+          <button onClick={handleSubmit} disabled={loading||!pass||!confirm||!email}
+            style={{ background:teal, color:"#fff", border:"none", borderRadius:10, padding:"13px", fontWeight:700, fontSize:15, cursor:"pointer", fontFamily:"inherit", opacity:(!pass||!confirm||!email)?0.6:1, marginTop:4 }}>
             {loading ? "A guardar..." : "Definir senha e entrar →"}
           </button>
         </div>
-
-        <div style={{ textAlign:"center", marginTop:20, fontSize:12, color:muted }}>
-          A tua senha é privada e segura.
-        </div>
+        <div style={{ textAlign:"center", marginTop:20, fontSize:12, color:muted }}>A tua senha é privada e segura.</div>
       </div>
     </div>
   );

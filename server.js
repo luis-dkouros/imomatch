@@ -641,6 +641,50 @@ app.get("*", (req, res) => {
 });
 
 // ── Iniciar servidor ──────────────────────────────────────────────────────
+
+// ── Definir senha inicial (agentes convidados) ──────────────────────────────
+app.post("/api/agencies/set-initial-password", async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: "email e password são obrigatórios." });
+  if (password.length < 6) return res.status(400).json({ error: "Password deve ter mínimo 6 caracteres." });
+
+  try {
+    // Verificar que este email existe e tem plan=agency (é realmente um agente convidado)
+    const usersRes = await supabaseRequest({
+      method: "GET",
+      path: `/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+      useServiceKey: true,
+    });
+    const user = usersRes.body?.users?.[0];
+    if (!user) return res.status(404).json({ error: "Email não encontrado." });
+
+    const profileRes = await supabaseRequest({
+      method: "GET",
+      path: `/rest/v1/profiles?id=eq.${user.id}&select=plan,agency_id`,
+      useServiceKey: true,
+    });
+    const profile = profileRes.body?.[0];
+    if (!profile?.agency_id) return res.status(403).json({ error: "Este email não pertence a nenhuma agência." });
+
+    // Definir a senha via admin API
+    const updateRes = await supabaseRequest({
+      method: "PUT",
+      path: `/auth/v1/admin/users/${user.id}`,
+      body: { password },
+      useServiceKey: true,
+    });
+    if (updateRes.status !== 200) {
+      return res.status(500).json({ error: "Erro ao definir senha: " + (updateRes.body?.message || "erro desconhecido") });
+    }
+
+    console.log(`[SET-PASSWORD] Senha definida para ${email}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[SET-PASSWORD] Erro:", err);
+    res.status(500).json({ error: "Erro interno." });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`✅ ImoPro server running on port ${PORT}`);
   console.log(`   SITE_URL: ${SITE_URL}`);
