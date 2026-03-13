@@ -9,6 +9,21 @@ const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Capturar tokens do hash imediatamente — antes do Supabase os processar/limpar
+// O email client mobile pode consumir o link antes do JS carregar
+const _hashParams = (() => {
+  try {
+    const h = window.location.hash.substring(1);
+    if (!h) return null;
+    const p = Object.fromEntries(new URLSearchParams(h));
+    if (p.access_token && p.refresh_token) {
+      // Guardar antes que seja limpo
+      window._inviteTokens = { access_token: p.access_token, refresh_token: p.refresh_token };
+    }
+  } catch(e) {}
+  return null;
+})();
+
 // Cliente público sem sessão – usado em rotas públicas como /imovel/:id
 // Garante que o RLS do Supabase não bloqueie utilizadores não autenticados
 const supabasePublic = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -983,27 +998,56 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const [error,      setError]      = useState("");
   const [showP,      setShowP]      = useState(false);
   const [showC,      setShowC]      = useState(false);
-  const userEmail = session?.user?.email || null;
+  const [userEmail, setUserEmail] = useState(session?.user?.email || null);
+  const [sessionReady, setSessionReady] = useState(!!session?.user?.email);
+
+  useEffect(() => {
+    if (userEmail) return;
+    // Tentar criar sessão a partir dos tokens capturados do hash
+    const tokens = window._inviteTokens;
+    if (tokens) {
+      supabase.auth.setSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token })
+        .then(({ data, error }) => {
+          if (data?.session?.user?.email) {
+            setUserEmail(data.session.user.email);
+            setSessionReady(true);
+            delete window._inviteTokens;
+          }
+        });
+      return;
+    }
+    // Fallback: polling ao getSession (caso o Supabase já tenha processado)
+    let tries = 0;
+    const poll = setInterval(async () => {
+      tries++;
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user?.email) {
+        setUserEmail(data.session.user.email);
+        setSessionReady(true);
+        clearInterval(poll);
+      } else if (tries >= 6) {
+        clearInterval(poll);
+        setSessionReady(true); // mostrar erro em vez de loading infinito
+      }
+    }, 500);
+    return () => clearInterval(poll);
+  }, [session]);
+
+  // Quando sessão chega via prop do pai
+  useEffect(() => {
+    if (session?.user?.email && !userEmail) {
+      setUserEmail(session.user.email);
+      setSessionReady(true);
+    }
+  }, [session]);
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
 
-  // Debug: mostrar estado actual
-  const [debugInfo, setDebugInfo] = useState("A iniciar...");
-  useEffect(() => {
-    let info = `session: ${session === undefined ? "undefined" : session === null ? "null" : "OK"} | email: ${session?.user?.email || "none"}`;
-    setDebugInfo(info);
-    // Também tentar getSession directamente
-    supabase.auth.getSession().then(({data}) => {
-      setDebugInfo(prev => prev + " | getSession: " + (data?.session?.user?.email || "null"));
-    });
-  }, [session]);
-
-  if (!userEmail) return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif", padding:20 }}>
-      <div style={{ textAlign:"center", color:muted, maxWidth:340 }}>
+  if (!sessionReady) return (
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif" }}>
+      <div style={{ textAlign:"center", color:muted }}>
         <div style={{ fontSize:32, marginBottom:12 }}>🔐</div>
-        <div style={{ fontSize:14, marginBottom:16 }}>A preparar o teu acesso...</div>
-        <div style={{ fontSize:11, background:"#0001", borderRadius:8, padding:"8px 12px", wordBreak:"break-all", textAlign:"left" }}>{debugInfo}</div>
+        <div style={{ fontSize:14 }}>A preparar o teu acesso...</div>
       </div>
     </div>
   );
