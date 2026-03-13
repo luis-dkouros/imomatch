@@ -967,7 +967,7 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
 
 
 // ── Ecrã de definir senha (agentes convidados) ────────────────────────────────
-function SetPasswordScreen({ session, onDone, dark }) {
+function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const teal  = "#3BB2A1";
   const bg    = dark ? "#0f172a" : "#f1f5f9";
   const card  = dark ? "#1e293b" : "#ffffff";
@@ -1002,12 +1002,13 @@ function SetPasswordScreen({ session, onDone, dark }) {
     const { error: err } = await supabase.auth.updateUser({ password: pass });
     if (err) { setError("Erro: " + err.message); setLoading(false); return; }
     // updateUser invalida a sessão — fazer login automático com a nova senha
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
       email:    refreshData.session.user.email,
       password: pass,
     });
     if (signInErr) { setError("Senha definida mas erro ao entrar: " + signInErr.message); setLoading(false); return; }
-    onDone();
+    // Passar nova sessão ao onDone para evitar estado null
+    onDone(signInData?.session);
   };
 
   return (
@@ -2325,18 +2326,22 @@ function ImoPro() {
     </div>
   );
 
-  if(!session) return <LoginScreen dark={dark}/>;
-
-  // ── Gate: definir senha (agentes convidados) ──
-  if(showSetPassword) return <SetPasswordScreen session={session} dark={dark} onDone={async ()=>{
-    // Recarregar perfil da BD antes de entrar — garante plan=agency actualizado
-    const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
-    if (data) setProfile(data);
+  // ── Gate: definir senha (agentes convidados) — ANTES do check de sessão ──
+  // showSetPassword pode ser true mesmo quando session é null (updateUser invalida sessão temporariamente)
+  if(showSetPassword) return <SetPasswordScreen session={session} dark={dark} supabase={supabase} onDone={async (newSession)=>{
+    // Usar a nova sessão do signInWithPassword
+    const activeSession = newSession || session;
+    if(activeSession) {
+      const { data } = await supabase.from("profiles").select("*").eq("id", activeSession.user.id).single();
+      if (data) setProfile(data);
+    }
     setShowSetPassword(false);
     setPage("dashboard");
     setNotif("🎉 Bem-vindo! O teu acesso está activo.");
     setTimeout(()=>setNotif(null),5000);
   }}/>
+
+  if(!session) return <LoginScreen dark={dark}/>;
 
   // ── Gate: plano pending/expired → forçar pagamento ──
   const currentPlan = (profile?.plan||"pending").toLowerCase();
