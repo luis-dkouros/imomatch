@@ -1001,6 +1001,12 @@ function SetPasswordScreen({ session, onDone, dark }) {
     }
     const { error: err } = await supabase.auth.updateUser({ password: pass });
     if (err) { setError("Erro: " + err.message); setLoading(false); return; }
+    // updateUser invalida a sessão — fazer login automático com a nova senha
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email:    refreshData.session.user.email,
+      password: pass,
+    });
+    if (signInErr) { setError("Senha definida mas erro ao entrar: " + signInErr.message); setLoading(false); return; }
     onDone();
   };
 
