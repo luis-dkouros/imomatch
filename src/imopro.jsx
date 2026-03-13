@@ -1017,9 +1017,17 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Erro ao definir senha."); setLoading(false); return; }
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
-      if (signInErr) { setError("Senha definida! Entra com o teu email e senha."); setLoading(false); return; }
-      onDone(null);
+      // Aguardar propagação e tentar login (até 3x com delay)
+      let signInErr, signInData;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise(r => setTimeout(r, 800));
+        const result = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
+        signInErr = result.error;
+        signInData = result.data;
+        if (!signInErr) break;
+      }
+      if (signInErr) { setError("Senha definida com sucesso! Clica em 'Entrar' abaixo."); setLoading(false); return; }
+      onDone(signInData?.session);
     } catch(e) {
       setError("Erro de ligação. Tenta novamente.");
       setLoading(false);
