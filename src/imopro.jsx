@@ -990,24 +990,26 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
     if (pass.length < 6) { setError("A senha deve ter pelo menos 6 caracteres."); return; }
     if (pass !== confirm) { setError("As senhas não coincidem."); return; }
     setLoading(true); setError("");
-    // Refrescar sessão antes de actualizar — garante que o JWT é válido
-    const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
-    if (refreshErr || !refreshData?.session) {
-      // Sessão inválida ou expirada — limpar e pedir novo login
-      await supabase.auth.signOut();
-      setError("A sessão expirou. Por favor entra com o link do email novamente.");
+    // Obter email da sessão actual (pode ser session ou via getSession)
+    let userEmail = session?.user?.email;
+    if (!userEmail) {
+      const { data: s } = await supabase.auth.getSession();
+      userEmail = s?.session?.user?.email;
+    }
+    if (!userEmail) {
+      setError("Sessão inválida. Por favor usa o link do email novamente.");
       setLoading(false);
       return;
     }
+    // Definir a senha
     const { error: err } = await supabase.auth.updateUser({ password: pass });
-    if (err) { setError("Erro: " + err.message); setLoading(false); return; }
-    // updateUser invalida a sessão — fazer login automático com a nova senha
+    if (err) { setError("Erro ao definir senha: " + err.message); setLoading(false); return; }
+    // updateUser invalida a sessão — entrar automaticamente com a nova senha
     const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-      email:    refreshData.session.user.email,
+      email:    userEmail,
       password: pass,
     });
-    if (signInErr) { setError("Senha definida mas erro ao entrar: " + signInErr.message); setLoading(false); return; }
-    // Passar nova sessão ao onDone para evitar estado null
+    if (signInErr) { setError("Senha definida! Agora entra com o teu email e senha."); setLoading(false); return; }
     onDone(signInData?.session);
   };
 
