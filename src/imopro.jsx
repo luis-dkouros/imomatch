@@ -983,22 +983,30 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
   const [error,      setError]      = useState("");
   const [showP,      setShowP]      = useState(false);
   const [showC,      setShowC]      = useState(false);
-  const [localEmail,     setLocalEmail]     = useState(session?.user?.email || null);
-  const [waitingSession, setWaitingSession] = useState(!session?.user?.email);
+  const [localEmail, setLocalEmail] = useState(session?.user?.email || null);
 
-  // O evento onAuthStateChange já foi consumido pelo pai.
-  // Basta observar a prop session — quando o pai actualizar, o efeito dispara.
+  // Polling à sessão — o token do link é processado de forma assíncrona pelo Supabase
+  // Não depende de eventos: verifica directamente até ter email ou timeout (5s)
   useEffect(() => {
-    if (session?.user?.email) {
-      setLocalEmail(session.user.email);
-      setWaitingSession(false);
-    }
-  }, [session]);
+    if (localEmail) return;
+    let tries = 0;
+    const poll = setInterval(async () => {
+      tries++;
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user?.email) {
+        setLocalEmail(data.session.user.email);
+        clearInterval(poll);
+      } else if (tries >= 10) {
+        clearInterval(poll);
+      }
+    }, 500);
+    return () => clearInterval(poll);
+  }, []);
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
 
-  // Mostrar loading enquanto aguarda sessão do Supabase
-  if (waitingSession) return (
+  // Loading enquanto aguarda sessão (máx 5s)
+  if (!localEmail) return (
     <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Inter,sans-serif" }}>
       <div style={{ textAlign:"center", color:muted }}>
         <div style={{ fontSize:32, marginBottom:12 }}>⏳</div>
