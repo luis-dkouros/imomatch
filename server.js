@@ -490,7 +490,8 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         return res.status(409).json({ error: "Este utilizador já pertence a outra agência." });
       }
 
-      // Actualizar perfil com dados da agência (forçar via PATCH com service key)
+      // Actualizar perfil com dados da agência
+      // service_role bypassa RLS — se ainda assim falhar, usamos upsert
       const patchRes = await supabaseRequest({
         method: "PATCH",
         path:   `/rest/v1/profiles?id=eq.${userId}`,
@@ -498,24 +499,28 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         useServiceKey: true,
         extraHeaders:  { Prefer: "return=representation" },
       });
-      console.log(`[INVITE] PATCH perfil response:`, patchRes.status, JSON.stringify(patchRes.body));
+      console.log(`[INVITE] PATCH response: ${patchRes.status}`, JSON.stringify(patchRes.body));
 
-      // Verificar se actualizou — se não, tentar INSERT com upsert
-      if (!patchRes.body || (Array.isArray(patchRes.body) && patchRes.body.length === 0)) {
-        console.log(`[INVITE] PATCH não actualizou — a tentar upsert`);
-        await supabaseRequest({
+      // Se PATCH não actualizou nenhuma linha, fazer upsert
+      const updated = Array.isArray(patchRes.body) ? patchRes.body.length > 0 : !!patchRes.body;
+      if (!updated) {
+        console.log(`[INVITE] PATCH sem resultado — upsert`);
+        const upsertRes = await supabaseRequest({
           method: "POST",
           path:   "/rest/v1/profiles",
           body:   { id: userId, name: email.split("@")[0], agency_id, agency_role: "member", plan: "agency" },
           useServiceKey: true,
           extraHeaders:  { Prefer: "return=representation,resolution=merge-duplicates" },
         });
+        console.log(`[INVITE] Upsert response: ${upsertRes.status}`, JSON.stringify(upsertRes.body));
       }
 
       console.log(`[INVITE] Utilizador existente ${email} vinculado à agência ${agency_id}`);
 
     } else {
-      // ── Utilizador sem conta — criar ──────────────────────────────────────
+      // ── Utilizador sem conta — criar com metadados ───────────────────────
+      // O trigger handle_new_user() vai ler estes metadados e criar o perfil
+      // directamente com plan=agency, agency_id e agency_role correctos
       const createRes = await supabaseRequest({
         method: "POST",
         path:   "/auth/v1/admin/users",
@@ -523,6 +528,12 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
           email,
           email_confirm: true,
           password: Math.random().toString(36).slice(2,10) + "Aa1!",
+          user_metadata: {
+            name:        email.split("@")[0],
+            plan:        "agency",
+            agency_id,
+            agency_role: "member",
+          },
         },
         useServiceKey: true,
       });
@@ -533,23 +544,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       }
 
       userId = createRes.body?.id;
-
-      // Criar perfil ligado à agência
-      await supabaseRequest({
-        method: "POST",
-        path:   "/rest/v1/profiles",
-        body: {
-          id:          userId,
-          name:        email.split("@")[0],
-          agency_id,
-          agency_role: "member",
-          plan:        "agency",
-        },
-        useServiceKey: true,
-        extraHeaders: { Prefer: "return=representation,resolution=merge-duplicates" },
-      });
-
-      console.log(`[INVITE] Nova conta criada para ${email} na agência ${agency_id}`);
+      console.log(`[INVITE] Nova conta criada para ${email} na agência ${agency_id} — perfil criado pelo trigger`);
     }
 
     // Limpar convite pendente se existia

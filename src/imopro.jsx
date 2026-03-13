@@ -2313,7 +2313,15 @@ function ImoPro() {
   if(!session) return <LoginScreen dark={dark}/>;
 
   // ── Gate: definir senha (agentes convidados) ──
-  if(showSetPassword) return <SetPasswordScreen session={session} dark={dark} onDone={()=>{setShowSetPassword(false);setPage("dashboard");setNotif("🎉 Bem-vindo! Senha definida com sucesso.");setTimeout(()=>setNotif(null),5000);}}/>
+  if(showSetPassword) return <SetPasswordScreen session={session} dark={dark} onDone={async ()=>{
+    // Recarregar perfil da BD antes de entrar — garante plan=agency actualizado
+    const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+    if (data) setProfile(data);
+    setShowSetPassword(false);
+    setPage("dashboard");
+    setNotif("🎉 Bem-vindo! O teu acesso está activo.");
+    setTimeout(()=>setNotif(null),5000);
+  }}/>
 
   // ── Gate: plano pending/expired → forçar pagamento ──
   const currentPlan = (profile?.plan||"pending").toLowerCase();
