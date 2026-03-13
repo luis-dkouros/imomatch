@@ -494,7 +494,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
       const patchRes = await supabaseRequest({
         method: "PATCH",
         path:   `/rest/v1/profiles?id=eq.${userId}`,
-        body:   { agency_id, agency_role: "agent", plan: "agency" },
+        body:   { agency_id, agency_role: "member", plan: "agency" },
         useServiceKey: true,
         extraHeaders:  { Prefer: "return=representation" },
       });
@@ -506,7 +506,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
         await supabaseRequest({
           method: "POST",
           path:   "/rest/v1/profiles",
-          body:   { id: userId, name: email.split("@")[0], agency_id, agency_role: "agent", plan: "agency" },
+          body:   { id: userId, name: email.split("@")[0], agency_id, agency_role: "member", plan: "agency" },
           useServiceKey: true,
           extraHeaders:  { Prefer: "return=representation,resolution=merge-duplicates" },
         });
@@ -542,7 +542,7 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
           id:          userId,
           name:        email.split("@")[0],
           agency_id,
-          agency_role: "agent",
+          agency_role: "member",
           plan:        "agency",
         },
         useServiceKey: true,

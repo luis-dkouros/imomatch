@@ -848,10 +848,10 @@ function ProfileModal({profile, session, onClose, onSaved, theme, isMobile}) {
   const userPlanPM    = (profile?.plan||"trial").toLowerCase();
   const trialStart    = profile?.created_at ? new Date(profile.created_at) : new Date();
   const trialDaysLeft = Math.max(0, TRIAL_DAYS_PM - Math.floor((new Date()-trialStart)/(1000*60*60*24)));
-  const isBasicPM     = userPlanPM === "basic";
+  const isBasicPM     = userPlanPM === "basic" || userPlanPM === "agency";
   const isTrialPM     = false;
   const planColor     = isBasicPM ? teal : isTrialPM ? "#f59e0b" : "#ef4444";
-  const planLabel     = isBasicPM ? "✦ Basic — Activo" : "⚠️ Sem subscrição activa";
+  const planLabel     = userPlanPM === "agency" ? "✦ Agência — Activo" : isBasicPM ? "✦ Basic — Activo" : "⚠️ Sem subscrição activa";
   const planDesc      = isBasicPM ? "Acesso completo a todas as funcionalidades." : "Subscreve o plano Basic para aceder ao sistema.";
 
   const handlePhoto = async (e) => {
@@ -1094,7 +1094,7 @@ function LoginScreen({dark}) {
           photo_url:   finalPhotoUrl || photoUrl,
           plan:        "agency",
           agency_id:   inviteData.agency_id,
-          agency_role: "agent",
+          agency_role: "member",
           updated_at:  new Date().toISOString()
         });
         // Marcar convite como aceite
@@ -2317,7 +2317,7 @@ function ImoPro() {
               <div style={{width:30,height:30,borderRadius:"50%",background:teal,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(currentUser?.name||"?")}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:600,color:text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{currentUser?.name||"..."}</div>
-                <div style={{fontSize:11,color:isBasic?teal:isTrialActive?"#f59e0b":"#ef4444",fontWeight:hasAccess?700:400}}>{isBasic?"✦ Basic Activo":"⚠️ Sem subscrição"}</div>
+                <div style={{fontSize:11,color:hasAccess?teal:isTrialActive?"#f59e0b":"#ef4444",fontWeight:hasAccess?700:400}}>{isBasic?"✦ Basic Activo":isAgency?"✦ Agência Activa":"⚠️ Sem subscrição"}</div>
               </div>
               <button onClick={()=>setShowProfileModal(true)} title="Editar perfil" style={{background:"none",border:"none",cursor:"pointer",color:muted,padding:4,flexShrink:0}}>
                 <span className="material-icons-outlined" style={{fontSize:18}}>edit</span>
@@ -2396,7 +2396,7 @@ function ImoPro() {
           <main style={{flex:1,overflowY:"auto",padding:isMobile?14:26}}>
 
             {/* BLOQUEIO — conta sem subscrição */}
-            {isPending&&page!=="billing"&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+            {isPending&&!isAgency&&page!=="billing"&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
               <div style={{background:card,borderRadius:20,padding:isMobile?"20px 16px":32,maxWidth:440,width:"100%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.4)"}}>
                 <div style={{fontSize:40,marginBottom:10}}>🔒</div>
                 <div style={{fontSize:18,fontWeight:800,color:text,marginBottom:6}}>Subscrição necessária</div>
@@ -2611,9 +2611,9 @@ function ImoPro() {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
                   <div>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                      <span style={{fontSize:22}}>{isBasic?"⭐":"⚠️"}</span>
-                      <div style={{fontSize:20,fontWeight:800,color:text}}>Plano {isBasic?"Basic":"Inactivo"}</div>
-                      <div style={{background:isBasic?teal:"#ef4444",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{isBasic?"ACTIVO":"SEM SUBSCRIÇÃO"}</div>
+                      <span style={{fontSize:22}}>{isBasic?"⭐":isAgency?"🏢":"⚠️"}</span>
+                      <div style={{fontSize:20,fontWeight:800,color:text}}>Plano {isBasic?"Basic":isAgency?"Agência":"Inactivo"}</div>
+                      <div style={{background:hasAccess?teal:"#ef4444",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700}}>{isBasic?"ACTIVO":isAgency?"ACTIVO":"SEM SUBSCRIÇÃO"}</div>
                     </div>
                     <div style={{fontSize:13,color:muted}}>
                       {isBasic?"Acesso completo a todas as funcionalidades.":"Subscreve o plano Basic para aceder a todas as funcionalidades."}
