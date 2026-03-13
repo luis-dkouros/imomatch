@@ -673,8 +673,20 @@ app.post("/api/agencies/set-initial-password", async (req, res) => {
       body: { password },
       useServiceKey: true,
     });
+    console.log(`[SET-PASSWORD] PUT response: ${updateRes.status}`, JSON.stringify(updateRes.body));
+
     if (updateRes.status !== 200) {
-      return res.status(500).json({ error: "Erro ao definir senha: " + (updateRes.body?.message || "erro desconhecido") });
+      // Tentar com PATCH se PUT falhou
+      const patchRes = await supabaseRequest({
+        method: "PATCH",
+        path: `/auth/v1/admin/users/${user.id}`,
+        body: { password },
+        useServiceKey: true,
+      });
+      console.log(`[SET-PASSWORD] PATCH response: ${patchRes.status}`, JSON.stringify(patchRes.body));
+      if (patchRes.status !== 200) {
+        return res.status(500).json({ error: "Erro ao definir senha: " + (patchRes.body?.message || updateRes.body?.message || "erro desconhecido") });
+      }
     }
 
     console.log(`[SET-PASSWORD] Senha definida para ${email}`);
