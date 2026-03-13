@@ -466,12 +466,15 @@ app.post("/api/agencies/invite-agent", async (req, res) => {
 
   try {
     // Verificar se já está noutra agência (se já tem conta)
+    // NOTA: /auth/v1/admin/users?email=X ignora o filtro — carregar todos e filtrar em código
     const existingRes = await supabaseRequest({
       method: "GET",
-      path:   `/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+      path:   `/auth/v1/admin/users?page=1&per_page=1000`,
       useServiceKey: true,
     });
-    const existingUser = existingRes.body?.users?.[0] || null;
+    const allUsers = existingRes.body?.users || [];
+    const existingUser = allUsers.find(u => u.email?.toLowerCase() === email.toLowerCase().trim()) || null;
+    console.log(`[INVITE] Procurar ${email} em ${allUsers.length} utilizadores → ${existingUser ? 'FOUND ' + existingUser.id : 'NOT FOUND'}`);
 
     let userId;
 
