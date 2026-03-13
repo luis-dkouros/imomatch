@@ -1907,7 +1907,7 @@ function ImoPro() {
   const [profile,   setProfile]   = useState(null);
   const [agencyTheme, setAgencyTheme] = useState(null); // cores/dados da agência do agente
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showSetPassword, setShowSetPassword]   = useState(false);
+  const [showSetPassword, setShowSetPassword]   = useState(() => new URLSearchParams(window.location.search).get("welcome") === "agency");
   const [selectedProps, setSelectedProps] = useState([]);
   const [selectedContacts, setSelectedContacts] = useState([]);
   const [confirmDeleteContacts, setConfirmDeleteContacts] = useState(false);
@@ -1965,28 +1965,24 @@ function ImoPro() {
 
   // ── Handle convite de agência (?welcome=agency) ──
   useEffect(()=>{
-    const params = new URLSearchParams(window.location.search);
-    if(params.get("welcome")==="agency" && session){
-      window.history.replaceState({},"",window.location.pathname);
-      setNotif("⏳ A activar o teu acesso...");
-      let tries = 0;
-      const poll = setInterval(async () => {
-        tries++;
-        const { data } = await supabase
-          .from("profiles")
-          .select("plan,agency_id,agency_role,name,phone,bio,photo_url,website,stripe_customer_id,created_at")
-          .eq("id", session.user.id)
-          .single();
-        if (data?.plan === "agency" || tries >= 10) {
-          clearInterval(poll);
-          if (data) setProfile(data);
-          setNotif(null);
-          // Mostrar ecrã de definir senha antes de entrar na app
-          setShowSetPassword(true);
-        }
-      }, 1000);
-    }
-  },[session]);
+    if(!showSetPassword || !session) return;
+    window.history.replaceState({},"",window.location.pathname);
+    // Polling até plan=agency estar na BD
+    let tries = 0;
+    const poll = setInterval(async () => {
+      tries++;
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single();
+      if (data?.plan === "agency" || tries >= 10) {
+        clearInterval(poll);
+        if (data) setProfile(data);
+      }
+    }, 1000);
+    return () => clearInterval(poll);
+  },[showSetPassword, session]);
 
   // ── Handle Stripe return (?payment=success) ──
   useEffect(()=>{
