@@ -1365,7 +1365,7 @@ function LoginScreen({dark}) {
 
               {/* Funcionalidades */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,background:`${teal}09`,border:`1px solid ${teal}22`,borderRadius:10,padding:12}}>
-                {["Contactos ilimitados","Imóveis ilimitados","Landing pages públicas","Campanhas WhatsApp","Matches automáticos","Suporte prioritário"].map((f,i)=>(
+                {["Contactos ilimitados","Imóveis ilimitados","Landing pages públicas","Matches automáticos","Suporte prioritário"].map((f,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:muted}}>
                     <span style={{color:"#10b981",fontWeight:700}}>✓</span>{f}
                   </div>
@@ -1491,7 +1491,8 @@ function LoginScreen({dark}) {
   );
 }
 
-const NAV_ITEMS=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"campaigns",icon:"bar_chart",label:"Campanhas"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"agency",icon:"business",label:"Agência"},{id:"billing",icon:"credit_card",label:"Plano"},{id:"help",icon:"help_outline",label:"Ajuda"}];
+const NAV_ITEMS_BASE=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"billing",icon:"credit_card",label:"Plano"},{id:"help",icon:"help_outline",label:"Ajuda"}];
+const NAV_ITEMS_AGENCY=[{id:"dashboard",icon:"home",label:"Início"},{id:"contacts",icon:"people",label:"Contactos"},{id:"properties",icon:"apartment",label:"Imóveis"},{id:"matches",icon:"auto_awesome",label:"Matches"},{id:"social",icon:"share",label:"Redes Sociais"},{id:"agency",icon:"business",label:"Agência"},{id:"billing",icon:"credit_card",label:"Plano"},{id:"help",icon:"help_outline",label:"Ajuda"}];
 const PLAN_LIMITS={pending:{contacts:0,properties:0},trial:{contacts:0,properties:0},basic:{contacts:Infinity,properties:Infinity}};
 const STRIPE_LINK=process.env.REACT_APP_STRIPE_LINK||"https://buy.stripe.com/YOUR_LINK_HERE";
 const STRIPE_LINK_30D=process.env.REACT_APP_STRIPE_LINK_30D||"https://buy.stripe.com/eVq14nbbK0K87Hv4dEcfK01";
@@ -2321,7 +2322,7 @@ function ImoPro() {
     setLoading(false);
   };
 
-  const PAGE_TITLE = {dashboard:"Início",contacts:"Contactos",properties:"Imóveis",matches:"Matches",campaigns:"Campanhas",social:"Redes Sociais",billing:"Plano & Subscrição",help:"Ajuda & Suporte"}[page];
+  const PAGE_TITLE = {dashboard:"Início",contacts:"Contactos",properties:"Imóveis",matches:"Matches",social:"Redes Sociais",billing:"Plano & Subscrição",help:"Ajuda & Suporte"}[page];
   const currentUser = profile ? {...profile, name: profile.name||session?.user?.email||"Utilizador"} : null;
 
   // ── Loading inicial ──
@@ -2417,15 +2418,25 @@ function ImoPro() {
         <aside style={{width:isMobile?(menuOpen?260:0):isTablet?60:236,background:sidebar,borderRight:`1px solid ${border}`,display:"flex",flexDirection:"column",flexShrink:0,transition:"all 0.25s",overflow:"hidden",position:isMobile?"fixed":"relative",height:"100vh",zIndex:isMobile?200:1}}>
           <div style={{padding:"20px 16px 16px",borderBottom:`1px solid ${border}`,flexShrink:0}}>
             {(!isTablet||isMobile)&&<div style={{display:"flex",alignItems:"center",gap:10}}>
-              <img src={LOGO_URL} alt="ImoMatch" style={{height:40,width:"auto",objectFit:"contain"}}/>
+              {isAgency && agencyTheme?.logo_url
+                ? <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                    <img src={agencyTheme.logo_url} alt={agencyTheme.name} style={{height:36,width:"auto",objectFit:"contain"}}/>
+                    <span style={{fontSize:9,color:muted,letterSpacing:"0.05em"}}>by imomatch.pt</span>
+                  </div>
+                : <img src={LOGO_URL} alt="ImoMatch" style={{height:40,width:"auto",objectFit:"contain"}}/>}
             </div>}
             {isTablet&&!isMobile&&<div style={{display:"flex",justifyContent:"center"}}>
-              <img src={LOGO_URL} alt="ImoMatch" style={{height:36,width:"auto",objectFit:"contain"}}/>
+              {isAgency && agencyTheme?.logo_url
+                ? <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                    <img src={agencyTheme.logo_url} alt={agencyTheme.name} style={{height:30,width:"auto",objectFit:"contain"}}/>
+                    <span style={{fontSize:8,color:muted,letterSpacing:"0.05em"}}>by imomatch.pt</span>
+                  </div>
+                : <img src={LOGO_URL} alt="ImoMatch" style={{height:36,width:"auto",objectFit:"contain"}}/>}
             </div>}
           </div>
           <nav style={{flex:1,padding:"12px 8px",display:"flex",flexDirection:"column",gap:2,overflowY:"auto"}}>
-            {NAV_ITEMS.map(({id,icon,label})=>{
-              const isLocked=!hasAccess&&(id==="campaigns"||id==="social");
+            {(isAgency?NAV_ITEMS_AGENCY:NAV_ITEMS_BASE).map(({id,icon,label})=>{
+              const isLocked=!hasAccess&&id==="social";
               const isBillingAlert=id==="billing"&&!hasAccess&&(contacts.length>=8||properties.length>=1);
               const active=page===id;
               return (
@@ -2477,7 +2488,12 @@ function ImoPro() {
                 <span className="material-icons-outlined" style={{fontSize:24}}>menu</span>
               </button>}
               {isMobile
-                ? <img src={LOGO_URL} alt="ImoMatch" style={{height:36,width:"auto",objectFit:"contain"}}/>
+                ? (isAgency && agencyTheme?.logo_url
+                    ? <div style={{display:"flex",flexDirection:"row",alignItems:"center",gap:4}}>
+                        <img src={agencyTheme.logo_url} alt={agencyTheme.name} style={{height:28,width:"auto",objectFit:"contain"}}/>
+                        <span style={{fontSize:8,color:muted}}>by imomatch.pt</span>
+                      </div>
+                    : <img src={LOGO_URL} alt="ImoMatch" style={{height:36,width:"auto",objectFit:"contain"}}/>)
                 : <h1 style={{fontSize:18,fontWeight:700,color:text,whiteSpace:"nowrap"}}>{PAGE_TITLE}</h1>
               }
             </div>
@@ -2711,31 +2727,6 @@ function ImoPro() {
               {!properties.length&&<div style={{...CARD,textAlign:"center",padding:40,color:muted}}>Adiciona imóveis para ver os matches.</div>}
             </div>}
 
-            {/* CAMPANHAS */}
-            {page==="campaigns"&&<div>
-              {!hasAccess&&<div style={{background:`${teal}11`,border:`1px solid ${teal}33`,borderRadius:14,padding:16,marginBottom:16,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                <span className="material-icons-outlined" style={{color:teal,fontSize:22}}>lock</span>
-                <div style={{flex:1,minWidth:200}}>
-                  <div style={{fontSize:13,fontWeight:700,color:text}}>Funcionalidade do Plano Basic</div>
-                  <div style={{fontSize:12,color:muted}}>Faz upgrade para aceder a Campanhas.</div>
-                </div>
-                <button onClick={()=>setShowUpgrade({reason:"feature",label:"Campanhas"})} style={{background:teal,color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Ver Planos</button>
-              </div>}
-              <div style={{opacity:hasAccess?1:0.35,pointerEvents:hasAccess?"auto":"none"}}>
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:isMobile?12:16,marginBottom:20}}>
-                {[["Enviados","0","#3b82f6","send"],["Entregues","0","#10b981","done_all"],["Visualizados","0",teal,"visibility"],["Respostas","0","#f59e0b","reply"]].map(([l,val,c,ic])=>(
-                  <div key={l} style={{...CARD,display:"flex",gap:12,alignItems:"center"}}>
-                    <div style={{width:40,height:40,borderRadius:9,background:`${c}18`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span className="material-icons-outlined" style={{color:c,fontSize:20}}>{ic}</span></div>
-                    <div><div style={{fontSize:10,color:muted,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em"}}>{l}</div><div style={{fontSize:26,fontWeight:700,color:c}}>{val}</div></div>
-                  </div>
-                ))}
-              </div>
-              <div style={{...CARD,textAlign:"center",padding:40,color:muted}}>
-                <span className="material-icons-outlined" style={{fontSize:40,display:"block",marginBottom:12}}>bar_chart</span>
-                Histórico de campanhas em breve.
-              </div>
-              </div>
-            </div>}
 
             {/* BILLING */}
             {page==="billing"&&<div>
@@ -2764,7 +2755,7 @@ function ImoPro() {
               <div style={{...CARD,borderRadius:16,marginBottom:20}}>
                 <div style={{fontSize:13,fontWeight:700,color:text,marginBottom:12}}>✦ Todas as funcionalidades incluídas:</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                  {["Contactos ilimitados","Imóveis ilimitados","Matches automáticos","Landing pages públicas","Campanhas WhatsApp","Redes Sociais","Histórico de envios","Suporte prioritário"].map((f,fi)=>(
+                  {["Contactos ilimitados","Imóveis ilimitados","Matches automáticos","Landing pages públicas","Redes Sociais","Histórico de envios","Suporte prioritário"].map((f,fi)=>(
                     <div key={fi} style={{display:"flex",alignItems:"center",gap:6}}>
                       <span style={{fontSize:13,color:"#10b981",fontWeight:700,flexShrink:0}}>✓</span>
                       <span style={{fontSize:12,color:text}}>{f}</span>
@@ -2865,7 +2856,7 @@ function ImoPro() {
                   {icon:"people",title:"Contactos",desc:"Adiciona contactos manualmente com nome, telefone, email e critérios de pesquisa (tipo de imóvel, tipologia, localização e budget). O código de país é seleccionável para clientes estrangeiros."},
                   {icon:"apartment",title:"Imóveis",desc:"Regista os teus imóveis com fotos, preço, tipologia e localização. O sistema cria automaticamente uma landing page partilhável para cada imóvel."},
                   {icon:"auto_awesome",title:"Matches",desc:"O sistema cruza automaticamente os critérios dos teus contactos com os imóveis disponíveis e sugere os melhores matches. Podes enviar o imóvel por WhatsApp directamente."},
-                  {icon:"bar_chart",title:"Campanhas",desc:"Cria campanhas para enviar um imóvel a vários contactos de uma vez. O sistema regista quem já recebeu e permite reenviar a qualquer altura."},
+
                   {icon:"share",title:"Redes Sociais",desc:"Gera posts optimizados para partilhar os teus imóveis no Instagram, Facebook e LinkedIn com texto e hashtags prontos a usar."},
                 ].map(({icon,title,desc},i)=>(
                   <div key={i} style={{display:"flex",gap:12,marginBottom:16,paddingBottom:16,borderBottom:i<4?`1px solid ${border}`:"none"}}>
@@ -3046,7 +3037,7 @@ function ImoPro() {
             </div>
             <div style={{background:`${teal}11`,borderRadius:12,padding:16,marginBottom:20,textAlign:"left"}}>
               <div style={{fontSize:13,fontWeight:700,color:teal,marginBottom:8}}>✦ Plano Basic inclui:</div>
-              {["Contactos ilimitados","Imóveis ilimitados","Landing pages públicas","Campanhas e Redes Sociais","Suporte prioritário"].map((f,i)=>(
+              {["Contactos ilimitados","Imóveis ilimitados","Landing pages públicas","Redes Sociais","Suporte prioritário"].map((f,i)=>(
                 <div key={i} style={{fontSize:13,color:text,display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                   <span style={{color:"#10b981",fontWeight:700}}>✓</span>{f}
                 </div>

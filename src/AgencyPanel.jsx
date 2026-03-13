@@ -311,7 +311,7 @@ export default function AgencyPanel({ supabase, session, profile, dark, onNotif 
           <div style={{ fontSize: 40, marginBottom: 12 }}>🏢</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: text, marginBottom: 8 }}>Ainda não tens uma agência</div>
           <div style={{ fontSize: 14, color: muted, marginBottom: 24 }}>
-            Subscreve um plano abaixo. Os agentes que convidares não precisam de pagar individualmente.
+            Subscreve um plano abaixo.
           </div>
           <AgencyPlansSection teal={teal} border={border} text={text} muted={muted} inp={inp} inpB={inpB} />
         </div>
@@ -624,10 +624,7 @@ export default function AgencyPanel({ supabase, session, profile, dark, onNotif 
                 Convidar agente
                 {atLimit && <span style={{ marginLeft: 8, fontSize: 11, color: "#ef4444" }}>⚠️ Limite ({currentUsers}/{maxUsers})</span>}
               </div>
-              <div style={{ fontSize: 12, color: muted, marginBottom: 14, background: `${teal}09`, border: `1px solid ${teal}22`, borderRadius: 8, padding: "8px 12px" }}>
-                💡 O agente não precisa de pagar — está incluído no plano da agência.<br/>
-                Se ainda não tiver conta, o convite fica pendente e é ligado quando criar conta.
-              </div>
+
               <div style={{ display: "flex", gap: 10 }}>
                 <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleInvite()}
