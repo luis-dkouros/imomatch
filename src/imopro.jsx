@@ -977,12 +977,12 @@ function SetPasswordScreen({ session, onDone, dark }) {
   const inpB  = dark ? "#334155" : "#e2e8f0";
   const border= dark ? "#334155" : "#e2e8f0";
 
-  const [pass,    setPass]    = React.useState("");
-  const [confirm, setConfirm] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [error,   setError]   = React.useState("");
-  const [showP,   setShowP]   = React.useState(false);
-  const [showC,   setShowC]   = React.useState(false);
+  const [pass,    setPass]    = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const [showP,   setShowP]   = useState(false);
+  const [showC,   setShowC]   = useState(false);
 
   const INP = { background:inp, border:`1px solid ${inpB}`, borderRadius:8, padding:"11px 14px", color:text, fontSize:14, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
 
