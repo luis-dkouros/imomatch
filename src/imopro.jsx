@@ -1357,6 +1357,11 @@ function LoginScreen({dark}) {
         <img src={LOGO_URL} alt="ImoMatch" style={{height:40,objectFit:"contain"}}/>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <a href="#planos" style={{fontSize:14,fontWeight:600,color:C.slate,textDecoration:"none"}}>Planos</a>
+          <a href="https://imomatch.pt/app.apk" download
+            style={{display:"inline-flex",alignItems:"center",gap:6,background:"#3BB2A108",border:`1.5px solid ${C.teal}44`,color:C.teal,borderRadius:10,padding:"8px 14px",fontWeight:600,fontSize:13,textDecoration:"none",whiteSpace:"nowrap"}}>
+            <span className="material-icons-outlined" style={{fontSize:16}}>android</span>
+            {!isMob&&"Instalar App"}
+          </a>
           <button onClick={()=>{setView("login");setError("");}}
             style={{background:"none",border:`1.5px solid ${C.teal}`,color:C.teal,borderRadius:10,padding:"8px 20px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
             Entrar
@@ -1373,10 +1378,10 @@ function LoginScreen({dark}) {
             <span style={{fontSize:12,fontWeight:700,color:"#a7f3d0",letterSpacing:"0.08em"}}>GESTÃO IMOBILIÁRIA PROFISSIONAL</span>
           </div>
           <h1 className="fade-up" style={{fontSize:isMob?"36px":"58px",fontWeight:900,color:"#ffffff",lineHeight:1.1,margin:"0 0 20px",animationDelay:"0.1s"}}>
-            Vende mais imóveis.<br/><span style={{color:"#6ee7df"}}>Com menos esforço.</span>
+            Encontre o imóvel certo<br/><span style={{color:"#6ee7df"}}>para cada cliente automaticamente.</span>
           </h1>
           <p className="fade-up" style={{fontSize:isMob?"16px":"20px",color:"rgba(255,255,255,0.8)",maxWidth:580,margin:"0 auto 40px",lineHeight:1.7,animationDelay:"0.2s"}}>
-            A plataforma all-in-one para consultores imobiliários que querem organizar os seus contactos, imóveis e redes sociais num único lugar.
+            O ImoMatch liga compradores qualificados aos imóveis certos e ajuda agentes imobiliários a vender mais rápido.
           </p>
           <div className="fade-up" style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",animationDelay:"0.3s"}}>
             <a href="#planos"
@@ -1410,7 +1415,7 @@ function LoginScreen({dark}) {
         <div style={{maxWidth:1000,margin:"0 auto"}}>
           <div style={{textAlign:"center",marginBottom:48}}>
             <div style={{fontSize:12,fontWeight:700,color:C.teal,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>RECONHECES ISTO?</div>
-            <h2 style={{fontSize:isMob?"28px":"38px",fontWeight:800,color:C.navy,margin:"0 0 12px",lineHeight:1.2}}>Os problemas que travam<br/>a tua carreira imobiliária</h2>
+            <h2 style={{fontSize:isMob?"28px":"38px",fontWeight:800,color:C.navy,margin:"0 0 12px",lineHeight:1.2}}>Porque os agentes perdem<br/>tanto tempo?</h2>
             <p style={{fontSize:16,color:C.slate,maxWidth:520,margin:"0 auto"}}>Cada consultor imobiliário enfrenta os mesmos obstáculos. Mas nem todos os resolvem.</p>
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMob?"1fr":"1fr 1fr",gap:20}}>
@@ -1433,11 +1438,43 @@ function LoginScreen({dark}) {
       </section>
 
       {/* ── FUNCIONALIDADES ── */}
+
+      {/* ── COMO FUNCIONA ── */}
+      <section style={{padding:isMob?"60px 5%":"80px 5%",background:C.navy}}>
+        <div style={{maxWidth:900,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:48}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.teal,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>PROCESSO</div>
+            <h2 style={{fontSize:isMob?"28px":"38px",fontWeight:800,color:"#fff",margin:0,lineHeight:1.2}}>Como Funciona</h2>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:isMob?"1fr":"1fr 1fr 1fr",gap:24,position:"relative"}}>
+            {[
+              {step:"1",icon:"person_add",color:C.teal,    title:"Adicione Compradores",  desc:"Regista os teus clientes com os seus requisitos: orçamento, tipologia, localização e preferências."},
+              {step:"2",icon:"apartment", color:"#3B82F6", title:"Adicione Imóveis",       desc:"Adiciona o teu portfolio de imóveis com fotos, preço, características e localização."},
+              {step:"3",icon:"auto_awesome",color:C.amber,  title:"Match Automático",       desc:"O sistema cruza compradores com imóveis e apresenta as melhores correspondências automaticamente."},
+            ].map((s,i)=>(
+              <div key={i} style={{position:"relative",textAlign:"center",padding:"32px 24px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:20}}>
+                {i<2&&!isMob&&<div style={{position:"absolute",right:-12,top:"50%",transform:"translateY(-50%)",fontSize:24,color:"rgba(255,255,255,0.2)",zIndex:1}}>→</div>}
+                <div style={{width:64,height:64,borderRadius:"50%",background:`${s.color}22`,border:`2px solid ${s.color}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+                  <span className="material-icons-outlined" style={{fontSize:28,color:s.color}}>{s.icon}</span>
+                </div>
+                <div style={{position:"absolute",top:16,right:16,width:24,height:24,borderRadius:"50%",background:s.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff"}}>{s.step}</div>
+                <div style={{fontSize:16,fontWeight:800,color:"#fff",marginBottom:10}}>{s.title}</div>
+                <div style={{fontSize:13,color:"rgba(255,255,255,0.65)",lineHeight:1.7}}>{s.desc}</div>
+                {i===2&&<div style={{marginTop:16,display:"inline-flex",alignItems:"center",gap:6,background:`${s.color}22`,border:`1px solid ${s.color}44`,borderRadius:99,padding:"6px 14px"}}>
+                  <span className="material-icons-outlined" style={{fontSize:16,color:s.color}}>check_circle</span>
+                  <span style={{fontSize:12,fontWeight:700,color:s.color}}>MATCH!</span>
+                </div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="funcionalidades" style={{padding:isMob?"60px 5%":"80px 5%",background:C.white}}>
         <div style={{maxWidth:1000,margin:"0 auto"}}>
           <div style={{textAlign:"center",marginBottom:48}}>
             <div style={{fontSize:12,fontWeight:700,color:C.teal,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>FUNCIONALIDADES</div>
-            <h2 style={{fontSize:isMob?"28px":"38px",fontWeight:800,color:C.navy,margin:"0 0 12px",lineHeight:1.2}}>Tudo o que precisas.<br/>Nada do que não precisas.</h2>
+            <h2 style={{fontSize:isMob?"28px":"38px",fontWeight:800,color:C.navy,margin:"0 0 12px",lineHeight:1.2}}>Tudo o que precisas.</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMob?"1fr":"1fr 1fr 1fr",gap:20}}>
             {FEATURES.map((f,i)=>(
@@ -1527,17 +1564,45 @@ function LoginScreen({dark}) {
             <h2 style={{fontSize:isMob?"26px":"34px",fontWeight:800,color:C.navy,margin:0}}>Perguntas frequentes</h2>
           </div>
           {[
-            ["Como funciona o período de teste?","Não existe período de teste — pagas logo e tens acesso imediato. Mas garantimos 30 dias de satisfação: se não estiveres satisfeito, devolvemos o valor."],
             ["Posso cancelar a qualquer momento?","Sim. No plano mensal, cancelas no portal Stripe e o acesso mantém-se até ao fim do período pago. Sem penalizações."],
             ["Como pago com MB Way ou Multibanco?","Escolhe o plano '30 dias' — aceita MB Way e Multibanco além de cartão. O plano mensal é apenas por cartão (renovação automática)."],
             ["Como funciona o plano de agência?","O owner cria a conta com o plano de agência. Depois convida os agentes no painel da agência — cada agente recebe email com acesso direto, sem precisar de pagar separadamente."],
             ["Perco os dados se cancelar?","Os teus dados ficam guardados durante 30 dias após o cancelamento. Podes reactivar a conta nesse período."],
           ].map(([q,a],i)=>(
-            <div key={i} style={{padding:"20px 0",borderBottom:i<4?`1px solid ${C.border}`:"none"}}>
+            <div key={i} style={{padding:"20px 0",borderBottom:i<3?`1px solid ${C.border}`:"none"}}>
               <div style={{fontSize:15,fontWeight:700,color:C.navy,marginBottom:8}}>{q}</div>
               <div style={{fontSize:14,color:C.slate,lineHeight:1.7}}>{a}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+
+      {/* ── BENEFÍCIOS ── */}
+      <section style={{padding:isMob?"60px 5%":"80px 5%",background:C.bg}}>
+        <div style={{maxWidth:900,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:48}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.teal,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>PORQUÊ O IMOMATCH</div>
+            <h2 style={{fontSize:isMob?"28px":"36px",fontWeight:800,color:C.navy,margin:0,lineHeight:1.2}}>Benefícios reais para o teu negócio</h2>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:isMob?"1fr":"1fr 1fr",gap:20}}>
+            {[
+              {icon:"schedule",    color:C.teal,    bg:"#3BB2A122", title:"Poupe Tempo",              desc:"Elimina tarefas manuais e repetitivas. O sistema faz o cruzamento de dados automaticamente, libertando horas do teu dia para o que realmente importa: fechar negócios."},
+              {icon:"sentiment_very_satisfied", color:"#3B82F6", bg:"#3B82F622", title:"Clientes Mais Satisfeitos", desc:"Apresenta aos teus clientes apenas os imóveis que correspondem exatamente ao que procuram. Menos visitas desnecessárias, mais relevância, maior satisfação."},
+              {icon:"trending_up", color:C.green,   bg:"#10b98122", title:"Mais Negócios Fechados",   desc:"Com matches precisos e follow-ups automatizados, o teu pipeline de vendas acelera. Menos leads perdidos, mais comissões no final do mês."},
+              {icon:"dashboard",   color:"#f59e0b", bg:"#f59e0b22", title:"Processo Organizado",      desc:"Todos os teus contactos, imóveis e comunicações num único lugar. Nunca mais perdes um lead, esqueces um follow-up ou procuras uma foto no WhatsApp."},
+            ].map((b,i)=>(
+              <div key={i} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:20,padding:28,display:"flex",gap:20,alignItems:"flex-start"}}>
+                <div style={{width:52,height:52,borderRadius:14,background:b.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <span className="material-icons-outlined" style={{fontSize:26,color:b.color}}>{b.icon}</span>
+                </div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:800,color:C.navy,marginBottom:8}}>{b.title}</div>
+                  <div style={{fontSize:13,color:C.slate,lineHeight:1.7}}>{b.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -2488,6 +2553,7 @@ function ImoPro() {
     setTimeout(()=>setNotif(null),5000);
   }}/>
 
+  React.useEffect(()=>{document.title="ImoMatch.pt — Gestão Imobiliária";},[]);
   if(!session) return <LoginScreen dark={dark}/>;
 
   // ── Gate: plano pending/expired → forçar pagamento ──
