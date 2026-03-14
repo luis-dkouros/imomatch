@@ -1360,7 +1360,7 @@ function LoginScreen({dark}) {
           <a href="https://imomatch.pt/app.apk" download
             style={{display:"inline-flex",alignItems:"center",gap:6,background:"#3BB2A108",border:`1.5px solid ${C.teal}44`,color:C.teal,borderRadius:10,padding:"8px 14px",fontWeight:600,fontSize:13,textDecoration:"none",whiteSpace:"nowrap"}}>
             <span className="material-icons-outlined" style={{fontSize:16}}>android</span>
-            {!isMob&&"Instalar App"}
+            {!isMob ? "Instalar App" : ""}
           </a>
           <button onClick={()=>{setView("login");setError("");}}
             style={{background:"none",border:`1.5px solid ${C.teal}`,color:C.teal,borderRadius:10,padding:"8px 20px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
@@ -2160,6 +2160,9 @@ function ImoPro() {
     window.addEventListener("resize",h); return()=>window.removeEventListener("resize",h);
   },[]);
 
+  // ── Document title ──
+  useEffect(()=>{document.title="ImoMatch.pt — Gestão Imobiliária";},[]);
+
   // ── Auth listener ──
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>setSession(session));
@@ -2553,7 +2556,6 @@ function ImoPro() {
     setTimeout(()=>setNotif(null),5000);
   }}/>
 
-  React.useEffect(()=>{document.title="ImoMatch.pt — Gestão Imobiliária";},[]);
   if(!session) return <LoginScreen dark={dark}/>;
 
   // ── Gate: plano pending/expired → forçar pagamento ──
