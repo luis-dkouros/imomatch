@@ -1357,7 +1357,7 @@ function LoginScreen({dark}) {
         <img src={LOGO_URL} alt="ImoMatch" style={{height:40,objectFit:"contain"}}/>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <a href="#planos" style={{fontSize:14,fontWeight:600,color:C.slate,textDecoration:"none"}}>Planos</a>
-          <a href="https://imomatch.pt/app.apk" download
+          <a href="https://www.imomatch.pt/imomatch.apk" download
             style={{display:"inline-flex",alignItems:"center",gap:6,background:"#3BB2A108",border:`1.5px solid ${C.teal}44`,color:C.teal,borderRadius:10,padding:"8px 14px",fontWeight:600,fontSize:13,textDecoration:"none",whiteSpace:"nowrap"}}>
             <span className="material-icons-outlined" style={{fontSize:16}}>android</span>
             {!isMob ? "Instalar App" : ""}
@@ -3126,7 +3126,7 @@ function ImoPro() {
                     <div style={{fontSize:15,fontWeight:700,color:text,marginBottom:4}}>Instalar App Android</div>
                     <div style={{fontSize:13,color:muted,lineHeight:1.5}}>Descarrega a app ImoMatch para o teu Android e usa-a como app nativa, sem browser.</div>
                   </div>
-                  <a href="/imomatch.apk" download style={{background:teal,color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:7,flexShrink:0}}>
+                  <a href="https://www.imomatch.pt/imomatch.apk" download style={{background:teal,color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"inherit",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:7,flexShrink:0}}>
                     <span className="material-icons-outlined" style={{fontSize:17}}>download</span>Download APK
                   </a>
                 </div>
