@@ -1514,30 +1514,42 @@ function PropertyPage() {
   const { id } = useParams();
   const [property, setProperty] = useState(null);
   const [agent, setAgent] = useState(null);
+  const [agency, setAgency] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePhoto, setActivePhoto] = useState(0);
   const [activeSection, setActiveSection] = useState("gallery");
-  const teal = "#3BB2A1";
   const navy = "#112D4E";
 
   useEffect(()=>{
     supabasePublic.from("properties").select("*").eq("id", id).single()
-      .then(({data, error})=>{
+      .then(async ({data, error})=>{
         if(!error && data){
           setProperty(data);
-          supabasePublic.from("profiles").select("*").eq("id", data.user_id).single()
-            .then(({data:ag})=>{ if(ag) setAgent(ag); });
+          const {data:ag} = await supabasePublic.from("profiles").select("*").eq("id", data.user_id).single();
+          if(ag){
+            setAgent(ag);
+            if(ag.agency_id){
+              const {data:agc} = await supabasePublic.from("agencies")
+                .select("id,name,logo_url,primary_color,secondary_color")
+                .eq("id", ag.agency_id).single();
+              if(agc) setAgency(agc);
+            }
+          }
         }
         setLoading(false);
       });
   },[id]);
+
+  const teal = agency?.primary_color || "#3BB2A1";
+  const brandLogo = agency?.logo_url || LOGO_URL;
+  const brandName = agency?.name || "ImoMatch";
 
   if(loading) return (
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f1f5f9",fontFamily:"Inter,sans-serif"}}>
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
       <div style={{textAlign:"center"}}>
         <img src={LOGO_URL} alt="ImoMatch" style={{height:48,marginBottom:20}}/>
-        <div style={{fontSize:14,color:"#3BB2A1"}}>A carregar...</div>
+        <div style={{fontSize:14,color:teal}}>A carregar...</div>
       </div>
     </div>
   );
@@ -1564,7 +1576,10 @@ function PropertyPage() {
 
       {/* Sticky Nav */}
       <nav style={{position:"sticky",top:0,zIndex:100,background:"#ffffff",backdropFilter:"blur(10px)",borderBottom:"1px solid #e2e8f0",padding:"0 24px",display:"flex",alignItems:"center",height:60,gap:24}}>
-        <img src={LOGO_URL} alt="ImoMatch" style={{height:38,objectFit:"contain",flexShrink:0}}/>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <img src={brandLogo} alt={brandName} style={{height:38,objectFit:"contain",maxWidth:140}}/>
+          {agency&&<span style={{fontSize:10,color:"#94a3b8",fontWeight:500,whiteSpace:"nowrap"}}>by imomatch.pt</span>}
+        </div>
         <div style={{display:"flex",gap:4,flex:1,overflowX:"auto"}}>
           {navItems.map(n=>(
             <a key={n.id} href={`#${n.id}`} onClick={()=>setActiveSection(n.id)}
@@ -1683,8 +1698,9 @@ function PropertyPage() {
               :<div style={{width:88,height:88,borderRadius:"50%",background:`${teal}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,flexShrink:0,border:"3px solid "+teal}}>👤</div>}
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:20,fontWeight:800,marginBottom:2,color:"#112D4E"}}>{agent?.name||"Agente Imobiliário"}</div>
-              {agent?.agency&&<div style={{fontSize:13,color:teal,fontWeight:600,marginBottom:6}}>{agent.agency}</div>}
-              {!agent?.agency&&<div style={{fontSize:13,color:teal,fontWeight:600,marginBottom:6}}>Consultor Imobiliário</div>}
+              <div style={{fontSize:13,color:teal,fontWeight:600,marginBottom:6}}>
+                {agency?.name || agent?.agency || "Consultor Imobiliário"}
+              </div>
               {agent?.bio&&<p style={{fontSize:13,color:"#475569",lineHeight:1.6,margin:"0 0 12px 0"}}>{agent.bio}</p>}
               <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
                 {agent?.phone&&(
@@ -1717,8 +1733,10 @@ function PropertyPage() {
         </div>
 
         <div style={{textAlign:"center",fontSize:12,color:"#94a3b8",paddingBottom:24}}>
-          <img src={LOGO_URL} alt="ImoMatch" style={{height:20,objectFit:"contain",verticalAlign:"middle",marginRight:8,opacity:0.6}}/>
-          ImoMatch © {new Date().getFullYear()}
+          {agency
+            ? <><img src={agency.logo_url} alt={agency.name} style={{height:20,objectFit:"contain",verticalAlign:"middle",marginRight:6,opacity:0.7}}/>{agency.name} · <img src={LOGO_URL} alt="ImoMatch" style={{height:14,objectFit:"contain",verticalAlign:"middle",marginLeft:4,marginRight:4,opacity:0.5}}/>ImoMatch</>
+            : <><img src={LOGO_URL} alt="ImoMatch" style={{height:20,objectFit:"contain",verticalAlign:"middle",marginRight:8,opacity:0.6}}/>ImoMatch © {new Date().getFullYear()}</>
+          }
         </div>
       </div>
     </div>
@@ -1727,11 +1745,11 @@ function PropertyPage() {
 
 // ─── PROPERTIES SELECTION PAGE ────────────────────────────────────────────────
 function PropertiesSelectionPage() {
-  const teal = "#3BB2A1";
   const navy = "#112D4E";
   const ids = new URLSearchParams(window.location.search).get("ids")?.split(",").filter(Boolean)||[];
   const [properties, setProperties] = useState([]);
   const [agent, setAgent] = useState(null);
+  const [agency, setAgency] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activePhoto, setActivePhoto] = useState({});
@@ -1739,16 +1757,28 @@ function PropertiesSelectionPage() {
   useEffect(()=>{
     if(!ids.length){setLoading(false);return;}
     supabase.from("properties").select("*").in("id", ids)
-      .then(({data})=>{
+      .then(async ({data})=>{
         if(data&&data.length>0){
           const sorted = data.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));
           setProperties(sorted);
-          supabase.from("profiles").select("*").eq("id", data[0].user_id).single()
-            .then(({data:ag})=>{ if(ag) setAgent(ag); });
+          const {data:ag} = await supabase.from("profiles").select("*").eq("id", data[0].user_id).single();
+          if(ag){
+            setAgent(ag);
+            if(ag.agency_id){
+              const {data:agc} = await supabase.from("agencies")
+                .select("id,name,logo_url,primary_color,secondary_color")
+                .eq("id", ag.agency_id).single();
+              if(agc) setAgency(agc);
+            }
+          }
         }
         setLoading(false);
       });
   },[]);
+
+  const teal = agency?.primary_color || "#3BB2A1";
+  const brandLogo = agency?.logo_url || LOGO_URL;
+  const brandName = agency?.name || "ImoMatch";
 
   const filtered = properties.filter(p=>!search||p.title?.toLowerCase().includes(search.toLowerCase())||p.concelho?.toLowerCase().includes(search.toLowerCase()));
 
@@ -1757,7 +1787,7 @@ function PropertiesSelectionPage() {
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
       <div style={{textAlign:"center"}}>
         <img src={LOGO_URL} alt="ImoMatch" style={{height:48,marginBottom:20}}/>
-        <div style={{fontSize:14,color:"#64748b"}}>A carregar...</div>
+        <div style={{fontSize:14,color:"#3BB2A1"}}>A carregar...</div>
       </div>
     </div>
   );
@@ -1773,7 +1803,10 @@ function PropertiesSelectionPage() {
       {/* Header */}
       <nav style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"10px 16px",display:"flex",flexDirection:"column",gap:8}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <img src={LOGO_URL} alt="ImoMatch" style={{height:38,objectFit:"contain",flexShrink:0}}/>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+            <img src={brandLogo} alt={brandName} style={{height:38,objectFit:"contain",maxWidth:140}}/>
+            {agency&&<span style={{fontSize:10,color:"#94a3b8",fontWeight:500,whiteSpace:"nowrap"}}>by imomatch.pt</span>}
+          </div>
           <div style={{flex:1}}/>
           {waLink&&<a href={waLink} target="_blank" rel="noreferrer"
             style={{display:"inline-flex",alignItems:"center",gap:6,background:teal,color:"#fff",padding:"8px 14px",borderRadius:10,fontWeight:700,fontSize:13,flexShrink:0,textDecoration:"none"}}>
@@ -1820,7 +1853,7 @@ function PropertiesSelectionPage() {
               :<div style={{width:56,height:56,borderRadius:"50%",background:`${teal}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>👤</div>}
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontWeight:700,color:navy,fontSize:16}}>{agent.name||"Agente Imobiliário"}</div>
-              <div style={{fontSize:13,color:teal,fontWeight:600}}>Consultor Imobiliário</div>
+              <div style={{fontSize:13,color:teal,fontWeight:600}}>{agency?.name||"Consultor Imobiliário"}</div>
               {agent.email&&<div style={{fontSize:12,color:"#64748b",marginTop:2}}>{agent.email}</div>}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -1891,8 +1924,10 @@ function PropertiesSelectionPage() {
         )}
 
         <div style={{textAlign:"center",marginTop:40,paddingBottom:24,fontSize:12,color:"#94a3b8"}}>
-          <img src={LOGO_URL} alt="ImoMatch" style={{height:20,objectFit:"contain",verticalAlign:"middle",marginRight:8,opacity:0.6}}/>
-          ImoMatch © {new Date().getFullYear()}
+          {agency
+            ? <><img src={agency.logo_url} alt={agency.name} style={{height:20,objectFit:"contain",verticalAlign:"middle",marginRight:6,opacity:0.7}}/>{agency.name} · <img src={LOGO_URL} alt="ImoMatch" style={{height:14,objectFit:"contain",verticalAlign:"middle",marginLeft:4,marginRight:4,opacity:0.5}}/>ImoMatch</>
+            : <><img src={LOGO_URL} alt="ImoMatch" style={{height:20,objectFit:"contain",verticalAlign:"middle",marginRight:8,opacity:0.6}}/>ImoMatch © {new Date().getFullYear()}</>
+          }
         </div>
       </div>
     </div>
