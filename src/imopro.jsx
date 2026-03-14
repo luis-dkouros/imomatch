@@ -1097,396 +1097,472 @@ function SetPasswordScreen({ session, onDone, dark, supabase }) {
 }
 
 function LoginScreen({dark}) {
-  const [mode,     setMode]     = useState("login");
-  // login fields
+  // ── Estados
+  const [view,       setView]       = useState("landing"); // "landing" | "login" | "signup"
+  const [signupStep, setSignupStep] = useState("plan");    // "plan" | "form"
+  const [chosenPlan, setChosenPlan] = useState(null);      // objeto do plano escolhido
+  // login
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPass,  setLoginPass]  = useState("");
-  // signup fields
+  // signup
+  const [name,     setName]     = useState("");
   const [email,    setEmail]    = useState("");
   const [pass,     setPass]     = useState("");
-  const [name,     setName]     = useState("");
   const [phone,    setPhone]    = useState("");
-  const [agency,   setAgency]   = useState("");
-  const [bio,      setBio]      = useState("");
-  const [photoUrl, setPhotoUrl] = useState("");
-  const [uploading,setUploading]= useState(false);
   const [error,    setError]    = useState("");
   const [loading,  setLoading]  = useState(false);
-  const [signupPlan, setSignupPlan] = useState("mensal"); // "mensal" | "30dias"
 
-  const teal  = "#3BB2A1";
-  const bg    = dark ? "#0f172a" : "#f1f5f9";
-  const card  = dark ? "#1e293b" : "#ffffff";
-  const border= dark ? "#334155" : "#e2e8f0";
-  const text  = dark ? "#f1f5f9" : "#0f172a";
-  const muted = dark ? "#94a3b8" : "#64748b";
-  const inp   = dark ? "#0f172a" : "#f8fafc";
-  const inpB  = dark ? "#334155" : "#cbd5e1";
-  const INP   = {background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"10px 13px",color:text,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"};
-  const LBL   = {display:"block",fontSize:11,fontWeight:700,color:muted,marginBottom:5,textTransform:"uppercase",letterSpacing:"0.06em"};
+  // ── Paleta (não usa o dark do app — landing é sempre clara)
+  const C = {
+    bg:       "#f8fafc",
+    white:    "#ffffff",
+    teal:     "#3BB2A1",
+    tealD:    "#2a8a7c",
+    navy:     "#112D4E",
+    slate:    "#475569",
+    muted:    "#94a3b8",
+    border:   "#e2e8f0",
+    inp:      "#f1f5f9",
+    inpB:     "#cbd5e1",
+    red:      "#ef4444",
+    amber:    "#f59e0b",
+    green:    "#10b981",
+  };
 
-  // ── Login ──
+  // ── Planos
+  const PLANS = [
+    {
+      id: "mensal", tag: "⭐ MAIS POPULAR", tagColor: C.teal,
+      name: "Basic Mensal", price: "4,90€", period: "/mês",
+      priceOld: "6,90€/mês", note: "Renovação automática · Cartão",
+      link: STRIPE_LINK, highlight: true,
+      features: ["Contactos ilimitados","Imóveis ilimitados","Matches automáticos","Landing pages públicas","Redes Sociais","Suporte prioritário"],
+    },
+    {
+      id: "30dias", tag: "MB Way · Multibanco", tagColor: C.slate,
+      name: "Acesso 30 dias", price: "6,90€", period: "",
+      priceOld: null, note: "Pagamento único · sem auto-renovação",
+      link: STRIPE_LINK_30D, highlight: false,
+      features: ["Tudo do plano mensal","Sem cartão de crédito","Renovação manual"],
+    },
+    {
+      id: "agency10", tag: "🏢 AGÊNCIA STARTER", tagColor: C.navy,
+      name: "Agency Starter", price: "29€", period: "/mês",
+      priceOld: null, note: "Até 10 agentes incluídos",
+      link: STRIPE_AGENCY_10, highlight: false, isAgency: true,
+      features: ["10 agentes incluídos","Painel de equipa","Logo e cores da agência","Landing pages por agente","Suporte prioritário"],
+    },
+    {
+      id: "agency20", tag: "🏆 AGÊNCIA GROWTH", tagColor: "#7c3aed",
+      name: "Agency Growth", price: "49€", period: "/mês",
+      priceOld: null, note: "Até 20 agentes incluídos",
+      link: STRIPE_AGENCY_20, highlight: false, isAgency: true,
+      features: ["20 agentes incluídos","Tudo do Starter","Funcionalidades Pro futuras","Prioridade máxima no suporte"],
+    },
+  ];
+
+  // ── Handlers
   const handleLogin = async () => {
-    if(!loginEmail.trim()||!loginPass) { setError("Preenche email e palavra-passe."); return; }
-    setLoading(true); setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPass });
-    if(error) setError(error.message === "Invalid login credentials" ? "Email ou palavra-passe incorrectos." : error.message);
+    if(!loginEmail.trim()||!loginPass){setError("Preenche email e palavra-passe.");return;}
+    setLoading(true);setError("");
+    const {error} = await supabase.auth.signInWithPassword({email:loginEmail.trim(),password:loginPass});
+    if(error) setError(error.message==="Invalid login credentials"?"Email ou palavra-passe incorrectos.":error.message);
     setLoading(false);
   };
 
-  // ── Upload foto ──
-  const handlePhoto = async (e) => {
-    const file = e.target.files[0]; if(!file) return;
-    setUploading(true); setError("");
-    // Guardar ficheiro localmente para upload após login
-    const reader = new FileReader();
-    reader.onload = () => {
-      // Guardar como data URL temporariamente — será re-uploaded após criar conta
-      setPhotoUrl(reader.result);
-      setUploading(false);
-    };
-    reader.onerror = () => { setError("Erro ao ler foto."); setUploading(false); };
-    reader.readAsDataURL(file);
-    // Guardar o ficheiro para upload posterior
-    window._signupPhotoFile = file;
-  };
-
-  // ── Signup: criar conta + perfil + ir para Stripe ──
   const handleSignup = async () => {
-    if(!name.trim())          { setError("O nome é obrigatório."); return; }
-    if(!email.trim())         { setError("O email é obrigatório."); return; }
-    if(pass.length < 6)       { setError("A palavra-passe deve ter mínimo 6 caracteres."); return; }
-    setLoading(true); setError("");
+    if(!name.trim()){setError("O nome é obrigatório.");return;}
+    if(!email.trim()){setError("O email é obrigatório.");return;}
+    if(pass.length<6){setError("A palavra-passe deve ter mínimo 6 caracteres.");return;}
+    setLoading(true);setError("");
     try {
-      // 1. Criar conta Supabase
-      const { data, error: signUpErr } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: pass,
-        options: { data: { name: name.trim() } }
+      const {data,error:signUpErr} = await supabase.auth.signUp({
+        email:email.trim(),password:pass,options:{data:{name:name.trim()}}
       });
-      if(signUpErr) { setError(signUpErr.message); setLoading(false); return; }
-
-      const userId = data?.user?.id;
-      if(!userId) {
-        setError("Erro ao criar conta. O email pode já estar registado.");
-        setLoading(false); return;
-      }
-
-      // 1b. Verificar se temos sessão (confirmação de email deve estar DESACTIVADA no Supabase)
-      if(!data.session) {
-        // Sem sessão = confirmação de email está activa → não conseguimos prosseguir para Stripe
-        setError("⚠️ Confirmação de email está activa no Supabase. Desactiva em Authentication → Providers → Email → 'Confirm email'.");
-        setLoading(false); return;
-      }
+      if(signUpErr){setError(signUpErr.message);setLoading(false);return;}
+      const userId=data?.user?.id;
+      if(!userId){setError("Erro ao criar conta. O email pode já estar registado.");setLoading(false);return;}
+      if(!data.session){setError("⚠️ Confirmação de email está activa no Supabase. Desactiva em Authentication → Providers → Email.");setLoading(false);return;}
       await supabase.auth.setSession(data.session);
-
-      // 1c. Upload da foto agora que temos sessão activa
-      let finalPhotoUrl = "";
-      if(window._signupPhotoFile) {
-        const file = window._signupPhotoFile;
-        const ext  = file.name.split(".").pop();
-        const photoPath = `${userId}/avatar-${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("property-photos").upload(photoPath, file, {contentType:file.type, upsert:true});
-        if(!upErr) {
-          const { data:{ publicUrl } } = supabase.storage.from("property-photos").getPublicUrl(photoPath);
-          finalPhotoUrl = publicUrl;
-        }
-        window._signupPhotoFile = null;
-      }
-
-      // 2. Guardar perfil (agora com sessão activa)
-      const { error: profileErr } = await supabase.from("profiles").upsert({
-        id:        userId,
-        name:      name.trim(),
-        phone:     phone.trim(),
-        agency:    agency.trim(),
-        bio:       bio.trim(),
-        photo_url: finalPhotoUrl || photoUrl,
-        plan:      "pending",
-        updated_at: new Date().toISOString()
+      await supabase.from("profiles").upsert({
+        id:userId,name:name.trim(),phone:phone.trim(),plan:"pending",updated_at:new Date().toISOString()
       });
-      if(profileErr) { setError("Conta criada mas erro no perfil: " + profileErr.message); setLoading(false); return; }
-
-      // 3. Verificar se há convite de agência pendente para este email
-      const { data: inviteData } = await supabase
-        .from("agency_invites")
-        .select("agency_id")
-        .eq("email", email.trim().toLowerCase())
-        .eq("status", "pending")
-        .single();
-
-      if (inviteData?.agency_id) {
-        // Agente convidado por agência — ligar directamente, sem Stripe
-        await supabase.from("profiles").upsert({
-          id:          userId,
-          name:        name.trim(),
-          phone:       phone.trim(),
-          bio:         bio.trim(),
-          photo_url:   finalPhotoUrl || photoUrl,
-          plan:        "agency",
-          agency_id:   inviteData.agency_id,
-          agency_role: "member",
-          updated_at:  new Date().toISOString()
-        });
-        // Marcar convite como aceite
-        await supabase.from("agency_invites")
-          .update({ status: "accepted" })
-          .eq("agency_id", inviteData.agency_id)
-          .eq("email", email.trim().toLowerCase());
-        // Redirecionar para a app directamente
+      // verificar convite agência
+      const {data:inviteData} = await supabase.from("agency_invites").select("agency_id")
+        .eq("email",email.trim().toLowerCase()).eq("status","pending").single();
+      if(inviteData?.agency_id){
+        await supabase.from("profiles").upsert({id:userId,name:name.trim(),phone:phone.trim(),plan:"agency",agency_id:inviteData.agency_id,agency_role:"agent",updated_at:new Date().toISOString()});
+        await supabase.from("agency_invites").update({status:"accepted"}).eq("agency_id",inviteData.agency_id).eq("email",email.trim().toLowerCase());
         window.history.replaceState({},"","/?welcome=agency");
-        setLoading(false);
-        return;
+        setLoading(false);return;
       }
-
-      // 4. Sem convite → fluxo normal Stripe
-      const baseLink = signupPlan === "30dias"
-        ? (process.env.REACT_APP_STRIPE_LINK_30D || "https://buy.stripe.com/eVq14nbbK0K87Hv4dEcfK01")
-        : (process.env.REACT_APP_STRIPE_LINK || "#");
-      if(baseLink === "#") { setError("Link do Stripe não configurado."); setLoading(false); return; }
-      const url = new URL(baseLink);
-      url.searchParams.set("client_reference_id", userId);
-      url.searchParams.set("prefilled_email", email.trim());
-      window.location.href = url.toString();
-
-    } catch(e) { setError("Erro de ligação. Tenta novamente."); setLoading(false); }
+      const baseLink = chosenPlan?.link||STRIPE_LINK;
+      if(!baseLink||baseLink==="#"){setError("Link do Stripe não configurado.");setLoading(false);return;}
+      const url=new URL(baseLink);
+      url.searchParams.set("client_reference_id",userId);
+      url.searchParams.set("prefilled_email",email.trim());
+      window.location.href=url.toString();
+    } catch(e){setError("Erro de ligação. Tenta novamente.");setLoading(false);}
   };
 
-  return (
-    <div style={{minHeight:"100vh",background:bg,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"'Inter',sans-serif"}}>
+  // ── Estilos partilhados
+  const INP = {background:C.inp,border:`1px solid ${C.inpB}`,borderRadius:10,padding:"12px 14px",color:C.navy,fontFamily:"inherit",fontSize:14,width:"100%",outline:"none",boxSizing:"border-box"};
+  const BTN_PRIMARY = {background:C.teal,color:"#fff",border:"none",borderRadius:12,padding:"14px 28px",fontWeight:700,fontSize:15,cursor:"pointer",fontFamily:"inherit",width:"100%",transition:"background 0.15s"};
+
+  // ── VIEWS ────────────────────────────────────────────────────────────────
+
+  // ── LOGIN ────────────────────────────────────────────────────────────────
+  if(view==="login") return (
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px",fontFamily:"'Inter',sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+      <div style={{width:"100%",maxWidth:420}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <img src={LOGO_URL} alt="ImoMatch" style={{height:52,objectFit:"contain",marginBottom:12}}/>
+          <div style={{fontSize:22,fontWeight:800,color:C.navy}}>Bem-vindo de volta</div>
+          <div style={{fontSize:14,color:C.muted,marginTop:4}}>Entra na tua conta ImoMatch</div>
+        </div>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:20,padding:32,boxShadow:"0 4px 24px rgba(17,45,78,0.07)"}}>
+          {error&&<div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:8,padding:"10px 14px",color:C.red,fontSize:13,marginBottom:16}}>{error}</div>}
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block",fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Email</label>
+            <input value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="o_teu@email.pt" style={INP}/>
+          </div>
+          <div style={{marginBottom:24}}>
+            <label style={{display:"block",fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Palavra-passe</label>
+            <input type="password" value={loginPass} onChange={e=>setLoginPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="••••••••" style={INP}/>
+          </div>
+          <button onClick={handleLogin} disabled={loading} style={{...BTN_PRIMARY,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1}}>
+            {loading?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A entrar...</>:<><span className="material-icons-outlined" style={{fontSize:18}}>login</span>Entrar</>}
+          </button>
+        </div>
+        <div style={{textAlign:"center",marginTop:20}}>
+          <button onClick={()=>{setView("landing");setError("");}} style={{background:"none",border:"none",color:C.teal,fontSize:14,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>
+            ← Voltar à página inicial
+          </button>
+        </div>
+        <div style={{textAlign:"center",marginTop:12}}>
+          <span style={{fontSize:13,color:C.muted}}>Não tens conta? </span>
+          <button onClick={()=>{setView("landing");setError("");}} style={{background:"none",border:"none",color:C.teal,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>
+            Ver planos
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
-      <div style={{width:"100%",maxWidth:460}}>
-        {/* Logo */}
+  // ── SIGNUP (plano já escolhido) ───────────────────────────────────────────
+  if(view==="signup") return (
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px",fontFamily:"'Inter',sans-serif"}}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+      <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+      <div style={{width:"100%",maxWidth:480}}>
+
+        {/* Header */}
         <div style={{textAlign:"center",marginBottom:28}}>
-          <img src={LOGO_URL} alt="ImoMatch" style={{height:64,objectFit:"contain",marginBottom:8}}/>
-          <p style={{fontSize:14,color:muted}}>Gestão Imobiliária Profissional</p>
+          <img src={LOGO_URL} alt="ImoMatch" style={{height:44,objectFit:"contain",marginBottom:12}}/>
+          <div style={{fontSize:20,fontWeight:800,color:C.navy}}>Criar conta — <span style={{color:C.teal}}>{chosenPlan?.name}</span></div>
+          <div style={{fontSize:13,color:C.muted,marginTop:4}}>A seguir serás redirecionado para o pagamento seguro via Stripe</div>
         </div>
 
-        <div style={{background:card,border:`1px solid ${border}`,borderRadius:18,padding:28,boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
+        {/* Plano seleccionado */}
+        <div style={{background:C.white,border:`2px solid ${C.teal}`,borderRadius:16,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:C.teal}}>{chosenPlan?.tag}</div>
+            <div style={{fontSize:15,fontWeight:800,color:C.navy}}>{chosenPlan?.name}</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:22,fontWeight:800,color:C.teal}}>{chosenPlan?.price}<span style={{fontSize:12,fontWeight:400,color:C.muted}}>{chosenPlan?.period}</span></div>
+            <button onClick={()=>{setView("landing");setError("");}} style={{background:"none",border:"none",color:C.muted,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Alterar plano</button>
+          </div>
+        </div>
 
-          {/* Tabs */}
-          <div style={{display:"flex",marginBottom:24,background:inp,borderRadius:10,padding:4}}>
-            {[["login","Entrar"],["signup","Criar conta"]].map(([m,l])=>(
-              <button key={m} onClick={()=>{setMode(m);setError("");}}
-                style={{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,
-                  background:mode===m?card:"transparent",color:mode===m?text:muted,
-                  boxShadow:mode===m?"0 1px 4px rgba(0,0,0,0.1)":"none",transition:"all 0.15s"}}>
-                {l}
-              </button>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:20,padding:28,boxShadow:"0 4px 24px rgba(17,45,78,0.06)"}}>
+          {error&&<div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:8,padding:"10px 14px",color:C.red,fontSize:13,marginBottom:16}}>{error}</div>}
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Nome completo *</label>
+              <input value={name} onChange={e=>setName(e.target.value)} placeholder="O teu nome" style={INP}/>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Email *</label>
+              <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@exemplo.pt" style={INP}/>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Palavra-passe * (mín. 6 caracteres)</label>
+              <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" style={INP}/>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:700,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Telefone / WhatsApp</label>
+              <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+351 9XX XXX XXX" style={INP}/>
+            </div>
+            <button onClick={handleSignup} disabled={loading} style={{...BTN_PRIMARY,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:8,opacity:loading?0.7:1}}>
+              {loading
+                ?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A processar...</>
+                :<><span className="material-icons-outlined" style={{fontSize:18}}>credit_card</span>Criar conta e ir para pagamento</>}
+            </button>
+            <div style={{textAlign:"center",fontSize:11,color:C.muted}}>
+              Pagamento 100% seguro via <strong>Stripe</strong>. Aceitas os nossos termos de serviço.
+            </div>
+          </div>
+        </div>
+
+        <div style={{textAlign:"center",marginTop:16}}>
+          <button onClick={()=>{setView("landing");setError("");}} style={{background:"none",border:"none",color:C.teal,fontSize:13,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>
+            ← Voltar aos planos
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── LANDING PAGE ─────────────────────────────────────────────────────────
+  const isMob = window.innerWidth < 768;
+
+  const DORES = [
+    {icon:"error_outline",     title:"Agenda em papel ou Excel?",    desc:"Perdes leads, esqueces follow-ups e não sabes quais clientes precisam de atenção agora."},
+    {icon:"photo_library",     title:"Fotos espalhadas por todo o lado?", desc:"WhatsApp, email, Google Drive… encontrar as fotos certas do imóvel certo demora demasiado."},
+    {icon:"share",             title:"Partilhar imóveis é trabalhoso?", desc:"Copiar links, fazer montagens, enviar manualmente — perdes tempo que podias usar para vender."},
+    {icon:"groups",            title:"Gerir a equipa é um caos?",    desc:"Sem visibilidade sobre o que cada agente está a fazer, a produtividade da equipa fica ao acaso."},
+  ];
+
+  const FEATURES = [
+    {icon:"people",       color:"#3BB2A1", title:"CRM de Contactos",      desc:"Gestão completa de leads e clientes com histórico, notas e follow-ups automáticos."},
+    {icon:"apartment",    color:"#3B82F6", title:"Gestão de Imóveis",     desc:"Portfolio digital com fotos, preço, tipologia e landing page pública gerada automaticamente."},
+    {icon:"auto_awesome", color:"#f59e0b", title:"Matches Automáticos",   desc:"Cruza imóveis com os requisitos dos clientes e sugere as melhores combinações."},
+    {icon:"share",        color:"#8b5cf6", title:"Redes Sociais",         desc:"Gera e agenda publicações para Instagram, Facebook e LinkedIn com um clique."},
+    {icon:"link",         color:"#10b981", title:"Landing Pages",         desc:"Cada imóvel tem uma página pública partilhável com galeria, mapa e contacto direto."},
+    {icon:"business",     color:"#112D4E", title:"Painel de Agência",     desc:"Para agências: gerir equipa, branding próprio e visibilidade total sobre toda a operação."},
+  ];
+
+  return (
+    <div style={{fontFamily:"'Inter',sans-serif",background:C.white,minHeight:"100vh",overflowX:"hidden"}}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+      <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+      <style>{`
+        *{box-sizing:border-box}
+        body{margin:0}
+        .lp-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,178,161,0.35)!important}
+        .plan-card:hover{transform:translateY(-4px);box-shadow:0 16px 48px rgba(17,45,78,0.12)!important}
+        .feat-card:hover{border-color:#3BB2A1!important}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+        .fade-up{animation:fadeUp 0.6s ease both}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+      `}</style>
+
+      {/* ── NAVBAR ── */}
+      <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,255,255,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${C.border}`,padding:"0 5%",height:64,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <img src={LOGO_URL} alt="ImoMatch" style={{height:40,objectFit:"contain"}}/>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <a href="#planos" style={{fontSize:14,fontWeight:600,color:C.slate,textDecoration:"none"}}>Planos</a>
+          <button onClick={()=>{setView("login");setError("");}}
+            style={{background:"none",border:`1.5px solid ${C.teal}`,color:C.teal,borderRadius:10,padding:"8px 20px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
+            Entrar
+          </button>
+        </div>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section style={{background:`linear-gradient(135deg, #112D4E 0%, #1a4a7a 50%, #3BB2A1 100%)`,padding:isMob?"80px 5% 60px":"100px 5% 80px",textAlign:"center",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle at 20% 50%, rgba(59,178,161,0.15) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.05) 0%, transparent 40%)"}}/>
+        <div style={{position:"relative",maxWidth:800,margin:"0 auto"}}>
+          <div className="fade-up" style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(59,178,161,0.2)",border:"1px solid rgba(59,178,161,0.4)",borderRadius:99,padding:"6px 16px",marginBottom:24}}>
+            <span style={{width:8,height:8,borderRadius:"50%",background:"#3BB2A1",display:"inline-block"}}/>
+            <span style={{fontSize:12,fontWeight:700,color:"#a7f3d0",letterSpacing:"0.08em"}}>GESTÃO IMOBILIÁRIA PROFISSIONAL</span>
+          </div>
+          <h1 className="fade-up" style={{fontSize:isMob?"36px":"58px",fontWeight:900,color:"#ffffff",lineHeight:1.1,margin:"0 0 20px",animationDelay:"0.1s"}}>
+            Vende mais imóveis.<br/><span style={{color:"#6ee7df"}}>Com menos esforço.</span>
+          </h1>
+          <p className="fade-up" style={{fontSize:isMob?"16px":"20px",color:"rgba(255,255,255,0.8)",maxWidth:580,margin:"0 auto 40px",lineHeight:1.7,animationDelay:"0.2s"}}>
+            A plataforma all-in-one para consultores imobiliários que querem organizar os seus contactos, imóveis e redes sociais num único lugar.
+          </p>
+          <div className="fade-up" style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",animationDelay:"0.3s"}}>
+            <a href="#planos"
+              className="lp-btn"
+              style={{display:"inline-flex",alignItems:"center",gap:8,background:C.teal,color:"#fff",borderRadius:14,padding:"15px 32px",fontWeight:800,fontSize:16,textDecoration:"none",boxShadow:"0 4px 16px rgba(59,178,161,0.3)",transition:"all 0.15s"}}>
+              <span className="material-icons-outlined" style={{fontSize:20}}>rocket_launch</span>
+              Começar agora — 4,90€/mês
+            </a>
+            <a href="#funcionalidades"
+              style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(255,255,255,0.1)",border:"1.5px solid rgba(255,255,255,0.3)",color:"#fff",borderRadius:14,padding:"15px 28px",fontWeight:600,fontSize:15,textDecoration:"none",backdropFilter:"blur(8px)"}}>
+              Ver funcionalidades
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SOCIAL PROOF ── */}
+      <section style={{background:C.navy,padding:"20px 5%"}}>
+        <div style={{maxWidth:900,margin:"0 auto",display:"flex",flexWrap:"wrap",justifyContent:"center",gap:isMob?16:40}}>
+          {[["★★★★★","Avaliação média"],["500+","Consultores activos"],["30 dias","Garantia de satisfação"],["Stripe","Pagamento seguro"]].map(([val,lbl])=>(
+            <div key={lbl} style={{textAlign:"center"}}>
+              <div style={{fontSize:isMob?"20px":"24px",fontWeight:900,color:C.teal}}>{val}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em"}}>{lbl}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── DORES ── */}
+      <section style={{padding:isMob?"60px 5%":"80px 5%",background:C.bg}}>
+        <div style={{maxWidth:1000,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:48}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.teal,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>RECONHECES ISTO?</div>
+            <h2 style={{fontSize:isMob?"28px":"38px",fontWeight:800,color:C.navy,margin:"0 0 12px",lineHeight:1.2}}>Os problemas que travam<br/>a tua carreira imobiliária</h2>
+            <p style={{fontSize:16,color:C.slate,maxWidth:520,margin:"0 auto"}}>Cada consultor imobiliário enfrenta os mesmos obstáculos. Mas nem todos os resolvem.</p>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:isMob?"1fr":"1fr 1fr",gap:20}}>
+            {DORES.map((d,i)=>(
+              <div key={i} style={{background:C.white,borderRadius:16,padding:24,border:`1px solid ${C.border}`,display:"flex",gap:16,alignItems:"flex-start"}}>
+                <div style={{width:44,height:44,borderRadius:12,background:"#ef444411",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <span className="material-icons-outlined" style={{fontSize:22,color:C.red}}>{d.icon}</span>
+                </div>
+                <div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.navy,marginBottom:6}}>{d.title}</div>
+                  <div style={{fontSize:13,color:C.slate,lineHeight:1.6}}>{d.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{textAlign:"center",marginTop:40,fontSize:18,fontWeight:700,color:C.navy}}>
+            O ImoMatch resolve todos estes problemas. <span style={{color:C.teal}}>Num único lugar.</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FUNCIONALIDADES ── */}
+      <section id="funcionalidades" style={{padding:isMob?"60px 5%":"80px 5%",background:C.white}}>
+        <div style={{maxWidth:1000,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:48}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.teal,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>FUNCIONALIDADES</div>
+            <h2 style={{fontSize:isMob?"28px":"38px",fontWeight:800,color:C.navy,margin:"0 0 12px",lineHeight:1.2}}>Tudo o que precisas.<br/>Nada do que não precisas.</h2>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:isMob?"1fr":"1fr 1fr 1fr",gap:20}}>
+            {FEATURES.map((f,i)=>(
+              <div key={i} className="feat-card" style={{background:C.white,borderRadius:16,padding:24,border:`1px solid ${C.border}`,transition:"border-color 0.2s"}}>
+                <div style={{width:48,height:48,borderRadius:14,background:`${f.color}18`,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
+                  <span className="material-icons-outlined" style={{fontSize:24,color:f.color}}>{f.icon}</span>
+                </div>
+                <div style={{fontSize:15,fontWeight:700,color:C.navy,marginBottom:8}}>{f.title}</div>
+                <div style={{fontSize:13,color:C.slate,lineHeight:1.6}}>{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PLANOS ── */}
+      <section id="planos" style={{padding:isMob?"60px 5%":"80px 5%",background:C.bg}}>
+        <div style={{maxWidth:1100,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:48}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.teal,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>PREÇOS</div>
+            <h2 style={{fontSize:isMob?"28px":"38px",fontWeight:800,color:C.navy,margin:"0 0 12px",lineHeight:1.2}}>Escolhe o teu plano.<br/>Começa hoje.</h2>
+            <p style={{fontSize:16,color:C.slate,maxWidth:480,margin:"0 auto"}}>Sem contratos longos. Sem taxas escondidas. Cancelas quando quiseres.</p>
+          </div>
+
+          {/* Planos individuais */}
+          <div style={{fontSize:13,fontWeight:700,color:C.navy,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:16}}>Consultor Individual</div>
+          <div style={{display:"grid",gridTemplateColumns:isMob?"1fr":"1fr 1fr",gap:20,marginBottom:40}}>
+            {PLANS.filter(p=>!p.isAgency).map(p=>(
+              <div key={p.id} className="plan-card" style={{background:C.white,border:`2px solid ${p.highlight?C.teal:C.border}`,borderRadius:20,padding:28,position:"relative",transition:"all 0.2s",boxShadow:p.highlight?"0 8px 32px rgba(59,178,161,0.12)":"none"}}>
+                {p.highlight&&<div style={{position:"absolute",top:-13,left:"50%",transform:"translateX(-50%)",background:C.teal,color:"#fff",borderRadius:99,padding:"4px 16px",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>⭐ RECOMENDADO</div>}
+                <div style={{fontSize:12,fontWeight:700,color:p.highlight?C.teal:C.slate,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>{p.tag}</div>
+                <div style={{fontSize:18,fontWeight:800,color:C.navy,marginBottom:4}}>{p.name}</div>
+                {p.priceOld&&<div style={{fontSize:12,color:C.muted,textDecoration:"line-through",marginBottom:4}}>{p.priceOld}</div>}
+                <div style={{display:"flex",alignItems:"baseline",gap:2,marginBottom:4}}>
+                  <span style={{fontSize:36,fontWeight:900,color:p.highlight?C.teal:C.navy}}>{p.price}</span>
+                  <span style={{fontSize:13,color:C.muted}}>{p.period}</span>
+                </div>
+                <div style={{fontSize:12,color:C.muted,marginBottom:20}}>{p.note}</div>
+                {p.features.map((f,i)=>(
+                  <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
+                    <span style={{color:C.green,fontWeight:800,fontSize:14,flexShrink:0}}>✓</span>
+                    <span style={{fontSize:13,color:C.slate}}>{f}</span>
+                  </div>
+                ))}
+                <button onClick={()=>{setChosenPlan(p);setView("signup");setError("");}}
+                  className="lp-btn"
+                  style={{width:"100%",marginTop:24,background:p.highlight?C.teal:C.white,color:p.highlight?"#fff":C.navy,border:p.highlight?"none":`2px solid ${C.border}`,borderRadius:12,padding:"13px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
+                  Começar com {p.name}
+                </button>
+              </div>
             ))}
           </div>
 
-          {error&&(
-            <div style={{background:"#ef444411",border:"1px solid #ef444433",borderRadius:8,padding:"10px 14px",color:"#ef4444",fontSize:13,marginBottom:16}}>
-              {error}
-            </div>
-          )}
-
-          {/* ── LOGIN ── */}
-          {mode==="login"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <div>
-                <label style={LBL}>Email</label>
-                <input value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-                  placeholder="o_teu@email.pt" style={INP}/>
-              </div>
-              <div>
-                <label style={LBL}>Palavra-passe</label>
-                <input type="password" value={loginPass} onChange={e=>setLoginPass(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-                  placeholder="••••••••" style={INP}/>
-              </div>
-              <button onClick={handleLogin} disabled={loading}
-                style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:8,padding:"12px",fontWeight:700,cursor:"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1,marginTop:4}}>
-                {loading
-                  ?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A entrar...</>
-                  :<><span className="material-icons-outlined" style={{fontSize:18}}>login</span>Entrar</>}
-              </button>
-            </div>
-          )}
-
-          {/* ── SIGNUP ── */}
-          {mode==="signup"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:13}}>
-
-              {/* Foto */}
-              <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <div style={{flexShrink:0}}>
-                  {photoUrl
-                    ?<img src={photoUrl} alt="" style={{width:60,height:60,borderRadius:"50%",objectFit:"cover",border:`3px solid ${teal}`}}/>
-                    :<div style={{width:60,height:60,borderRadius:"50%",background:`${teal}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,border:`2px dashed ${teal}`}}>👤</div>}
+          {/* Planos agência */}
+          <div style={{fontSize:13,fontWeight:700,color:C.navy,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:16}}>🏢 Para Agências</div>
+          <div style={{display:"grid",gridTemplateColumns:isMob?"1fr":"1fr 1fr",gap:20}}>
+            {PLANS.filter(p=>p.isAgency).map(p=>(
+              <div key={p.id} className="plan-card" style={{background:C.white,border:`2px solid ${C.border}`,borderRadius:20,padding:28,transition:"all 0.2s"}}>
+                <div style={{fontSize:12,fontWeight:700,color:C.navy,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>{p.tag}</div>
+                <div style={{fontSize:18,fontWeight:800,color:C.navy,marginBottom:4}}>{p.name}</div>
+                <div style={{display:"flex",alignItems:"baseline",gap:2,marginBottom:4}}>
+                  <span style={{fontSize:36,fontWeight:900,color:C.navy}}>{p.price}</span>
+                  <span style={{fontSize:13,color:C.muted}}>{p.period}</span>
                 </div>
-                <div>
-                  <label style={LBL}>Foto de perfil</label>
-                  <label style={{display:"inline-flex",alignItems:"center",gap:6,background:inp,border:`1px solid ${inpB}`,borderRadius:8,padding:"7px 12px",cursor:"pointer",fontSize:13,color:text,fontWeight:600}}>
-                    <span className="material-icons-outlined" style={{fontSize:15}}>{uploading?"autorenew":"upload"}</span>
-                    {uploading?"A carregar...":"Carregar foto"}
-                    <input type="file" accept="image/*" onChange={handlePhoto} style={{display:"none"}} disabled={uploading}/>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label style={LBL}>Nome completo *</label>
-                <input value={name} onChange={e=>setName(e.target.value)} placeholder="O teu nome" style={INP}/>
-              </div>
-
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <div>
-                  <label style={LBL}>Email *</label>
-                  <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@exemplo.pt" style={INP}/>
-                </div>
-                <div>
-                  <label style={LBL}>Palavra-passe *</label>
-                  <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Mín. 6 caracteres" style={INP}/>
-                </div>
-              </div>
-
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <div>
-                  <label style={LBL}>Telefone / WhatsApp</label>
-                  <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+351 9XX XXX XXX" style={INP}/>
-                </div>
-                <div>
-                  <label style={LBL}>Agência / Empresa</label>
-                  <input value={agency} onChange={e=>setAgency(e.target.value)} placeholder="Nome da agência" style={INP}/>
-                </div>
-              </div>
-
-              <div>
-                <label style={LBL}>Apresentação <span style={{fontWeight:400,textTransform:"none",fontSize:10}}>(aparece na landing page)</span></label>
-                <textarea value={bio} onChange={e=>setBio(e.target.value)}
-                  placeholder="Ex: Consultor imobiliário com 10 anos de experiência..."
-                  style={{...INP,resize:"vertical"}} rows={3}/>
-              </div>
-
-              {/* Funcionalidades */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,background:`${teal}09`,border:`1px solid ${teal}22`,borderRadius:10,padding:12}}>
-                {["Contactos ilimitados","Imóveis ilimitados","Landing pages públicas","Matches automáticos","Suporte prioritário"].map((f,i)=>(
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:muted}}>
-                    <span style={{color:"#10b981",fontWeight:700}}>✓</span>{f}
+                <div style={{fontSize:12,color:C.muted,marginBottom:20}}>{p.note}</div>
+                {p.features.map((f,i)=>(
+                  <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
+                    <span style={{color:C.green,fontWeight:800,fontSize:14,flexShrink:0}}>✓</span>
+                    <span style={{fontSize:13,color:C.slate}}>{f}</span>
                   </div>
                 ))}
+                <button onClick={()=>{setChosenPlan(p);setView("signup");setError("");}}
+                  className="lp-btn"
+                  style={{width:"100%",marginTop:24,background:C.navy,color:"#fff",border:"none",borderRadius:12,padding:"13px",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>
+                  Começar com {p.name}
+                </button>
               </div>
-
-              {/* Selecção de plano */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                {/* Mensal */}
-                <div onClick={()=>setSignupPlan("mensal")}
-                  style={{borderRadius:12,border:`2px solid ${signupPlan==="mensal"?teal:inpB}`,padding:12,cursor:"pointer",background:signupPlan==="mensal"?`${teal}09`:inp,transition:"all 0.15s",textAlign:"center"}}>
-                  <div style={{fontSize:11,fontWeight:700,color:signupPlan==="mensal"?teal:muted,marginBottom:4}}>⭐ MENSAL</div>
-                  <div style={{fontSize:11,color:muted,textDecoration:"line-through"}}>6,90€/mês</div>
-                  <div style={{fontSize:20,fontWeight:800,color:signupPlan==="mensal"?teal:text}}>4,90€<span style={{fontSize:11,fontWeight:400}}>/mês</span></div>
-                  <div style={{fontSize:10,color:muted,marginTop:4}}>Renovação automática</div>
-                  <div style={{fontSize:10,color:muted}}>Cartão</div>
-                </div>
-                {/* 30 dias */}
-                <div onClick={()=>setSignupPlan("30dias")}
-                  style={{borderRadius:12,border:`2px solid ${signupPlan==="30dias"?teal:inpB}`,padding:12,cursor:"pointer",background:signupPlan==="30dias"?`${teal}09`:inp,transition:"all 0.15s",textAlign:"center"}}>
-                  <div style={{fontSize:11,fontWeight:700,color:signupPlan==="30dias"?teal:muted,marginBottom:4}}>📅 30 DIAS</div>
-                  <div style={{fontSize:11,color:muted,opacity:0}}>&nbsp;</div>
-                  <div style={{fontSize:20,fontWeight:800,color:signupPlan==="30dias"?teal:text}}>6,90€</div>
-                  <div style={{fontSize:10,color:muted,marginTop:4}}>Renovação manual</div>
-                  <div style={{fontSize:10,color:muted}}>MB Way · Multibanco</div>
-                </div>
-              </div>
-
-              <button onClick={handleSignup} disabled={loading||uploading}
-                style={{width:"100%",background:teal,color:"#fff",border:"none",borderRadius:10,padding:"13px",fontWeight:700,cursor:"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:(loading||uploading)?0.7:1}}>
-                {loading
-                  ?<><span className="material-icons-outlined" style={{fontSize:18,animation:"spin 1s linear infinite"}}>autorenew</span>A processar...</>
-                  :<><span className="material-icons-outlined" style={{fontSize:18}}>credit_card</span>
-                    {signupPlan==="mensal" ? "Criar conta e pagar 4,90€/mês" : "Criar conta e pagar 6,90€ (30 dias)"}
-                  </>}
-              </button>
-
-              <div style={{textAlign:"center",fontSize:11,color:muted}}>
-                Ao criar conta aceitas os nossos termos de serviço.<br/>
-                Pagamento seguro via <strong>Stripe</strong>.
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── SECÇÃO AGÊNCIAS ── */}
-        <div style={{marginTop:32}}>
-          <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:13,fontWeight:700,color:teal,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>🏢 Planos para Agências</div>
-            <div style={{fontSize:14,color:muted}}>Gere toda a tua equipa numa única plataforma</div>
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-            {/* Basic */}
-            <div style={{background:card,border:`1px solid ${border}`,borderRadius:16,padding:20,textAlign:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-              <div style={{fontSize:28,marginBottom:6}}>🏢</div>
-              <div style={{fontSize:13,fontWeight:800,color:text,marginBottom:4}}>Basic</div>
-              <div style={{fontSize:22,fontWeight:800,color:teal,marginBottom:2}}>
-                {process.env.REACT_APP_STRIPE_AGENCY_10?"—":"Em breve"}
-              </div>
-              <div style={{fontSize:11,color:muted,marginBottom:10}}>até 10 agentes</div>
-              {[
-                "Página pública da agência",
-                "Tema e cores personalizadas",
-                "Gestão da equipa",
-                "Portal de billing",
-              ].map((f,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:muted,marginBottom:4,textAlign:"left"}}>
-                  <span style={{color:"#10b981",fontWeight:700,flexShrink:0}}>✓</span>{f}
-                </div>
-              ))}
-              {process.env.REACT_APP_STRIPE_AGENCY_10
-                ?<a href={process.env.REACT_APP_STRIPE_AGENCY_10} target="_blank" rel="noreferrer"
-                    style={{display:"block",marginTop:12,background:teal,color:"#fff",borderRadius:8,padding:"9px",fontWeight:700,fontSize:13,textDecoration:"none"}}>
-                    Subscrever
-                  </a>
-                :<div style={{marginTop:12,background:`${teal}15`,color:teal,borderRadius:8,padding:"9px",fontWeight:700,fontSize:12}}>
-                  Em breve
-                </div>
-              }
-            </div>
-
-            {/* Pro */}
-            <div style={{background:card,border:`2px solid ${teal}`,borderRadius:16,padding:20,textAlign:"center",boxShadow:"0 4px 20px rgba(59,178,161,0.15)",position:"relative"}}>
-              <div style={{position:"absolute",top:-11,left:"50%",transform:"translateX(-50%)",background:teal,color:"#fff",fontSize:10,fontWeight:700,borderRadius:99,padding:"3px 12px",whiteSpace:"nowrap"}}>MAIS POPULAR</div>
-              <div style={{fontSize:28,marginBottom:6}}>🏆</div>
-              <div style={{fontSize:13,fontWeight:800,color:text,marginBottom:4}}>Pro</div>
-              <div style={{fontSize:22,fontWeight:800,color:teal,marginBottom:2}}>
-                {process.env.REACT_APP_STRIPE_AGENCY_20?"—":"Em breve"}
-              </div>
-              <div style={{fontSize:11,color:muted,marginBottom:10}}>até 20 agentes</div>
-              {[
-                "Tudo do Basic",
-                "Até 20 agentes",
-                "Prioridade no suporte",
-                "Futuras funcionalidades Pro",
-              ].map((f,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:muted,marginBottom:4,textAlign:"left"}}>
-                  <span style={{color:"#10b981",fontWeight:700,flexShrink:0}}>✓</span>{f}
-                </div>
-              ))}
-              {process.env.REACT_APP_STRIPE_AGENCY_20
-                ?<a href={process.env.REACT_APP_STRIPE_AGENCY_20} target="_blank" rel="noreferrer"
-                    style={{display:"block",marginTop:12,background:teal,color:"#fff",borderRadius:8,padding:"9px",fontWeight:700,fontSize:13,textDecoration:"none"}}>
-                    Subscrever
-                  </a>
-                :<div style={{marginTop:12,background:`${teal}15`,color:teal,borderRadius:8,padding:"9px",fontWeight:700,fontSize:12}}>
-                  Em breve
-                </div>
-              }
-            </div>
-          </div>
-
-          <div style={{textAlign:"center",fontSize:12,color:muted}}>
-            Para criar uma agência, subscreve um plano e o owner adiciona os agentes no painel.
+            ))}
           </div>
         </div>
+      </section>
 
-        <p style={{textAlign:"center",fontSize:12,color:muted,marginTop:24}}>ImoMatch © {new Date().getFullYear()}</p>
-      </div>
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+      {/* ── FAQ ── */}
+      <section style={{padding:isMob?"60px 5%":"80px 5%",background:C.white}}>
+        <div style={{maxWidth:680,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:40}}>
+            <h2 style={{fontSize:isMob?"26px":"34px",fontWeight:800,color:C.navy,margin:0}}>Perguntas frequentes</h2>
+          </div>
+          {[
+            ["Como funciona o período de teste?","Não existe período de teste — pagas logo e tens acesso imediato. Mas garantimos 30 dias de satisfação: se não estiveres satisfeito, devolvemos o valor."],
+            ["Posso cancelar a qualquer momento?","Sim. No plano mensal, cancelas no portal Stripe e o acesso mantém-se até ao fim do período pago. Sem penalizações."],
+            ["Como pago com MB Way ou Multibanco?","Escolhe o plano '30 dias' — aceita MB Way e Multibanco além de cartão. O plano mensal é apenas por cartão (renovação automática)."],
+            ["Como funciona o plano de agência?","O owner cria a conta com o plano de agência. Depois convida os agentes no painel da agência — cada agente recebe email com acesso direto, sem precisar de pagar separadamente."],
+            ["Perco os dados se cancelar?","Os teus dados ficam guardados durante 30 dias após o cancelamento. Podes reactivar a conta nesse período."],
+          ].map(([q,a],i)=>(
+            <div key={i} style={{padding:"20px 0",borderBottom:i<4?`1px solid ${C.border}`:"none"}}>
+              <div style={{fontSize:15,fontWeight:700,color:C.navy,marginBottom:8}}>{q}</div>
+              <div style={{fontSize:14,color:C.slate,lineHeight:1.7}}>{a}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── CTA FINAL ── */}
+      <section style={{background:`linear-gradient(135deg, #112D4E 0%, #3BB2A1 100%)`,padding:isMob?"60px 5%":"80px 5%",textAlign:"center"}}>
+        <div style={{maxWidth:600,margin:"0 auto"}}>
+          <h2 style={{fontSize:isMob?"28px":"40px",fontWeight:900,color:"#fff",margin:"0 0 16px",lineHeight:1.2}}>Pronto para transformar o teu negócio imobiliário?</h2>
+          <p style={{fontSize:16,color:"rgba(255,255,255,0.8)",margin:"0 0 36px",lineHeight:1.7}}>Junta-te a centenas de consultores que já estão a usar o ImoMatch para vender mais e trabalhar menos.</p>
+          <a href="#planos"
+            className="lp-btn"
+            style={{display:"inline-flex",alignItems:"center",gap:8,background:C.white,color:C.navy,borderRadius:14,padding:"16px 36px",fontWeight:800,fontSize:16,textDecoration:"none",transition:"all 0.15s"}}>
+            <span className="material-icons-outlined" style={{fontSize:20,color:C.teal}}>rocket_launch</span>
+            Começar agora
+          </a>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{background:C.navy,padding:"24px 5%",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+        <img src={LOGO_URL} alt="ImoMatch" style={{height:32,objectFit:"contain",opacity:0.8}}/>
+        <div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>© {new Date().getFullYear()} ImoMatch. Todos os direitos reservados.</div>
+        <button onClick={()=>{setView("login");setError("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,0.5)",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+          Já tenho conta — Entrar
+        </button>
+      </footer>
     </div>
   );
 }
